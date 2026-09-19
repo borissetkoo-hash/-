@@ -56,6 +56,9 @@ let settleCounter = -1;
 let ended = false;
 let frameCount = 0;
 let particles = [];
+let celebrated50 = false;   // one-shot "Cartman is happy" trigger at 50% blue collected
+let celebrateFrame = -1;    // frame the celebration burst started, -1 = inactive
+let currentBluePct = 0;
 
 const bgCanvas = document.getElementById('bgCanvas');
 const waterCanvas = document.getElementById('waterCanvas');
@@ -181,6 +184,9 @@ function buildLevel() {
   frameCount = 0;
   particles = [];
   overlay.classList.add('hidden');
+  stopDigSound();
+  celebrated50 = false;
+  celebrateFrame = -1;
   updateHud();
 }
 
@@ -196,15 +202,31 @@ function stageToGrid(clientX, clientY) {
 }
 
 function digAt(gx, gy) {
+  let dugAny = false;
   for (let dy = -DIG_R; dy <= DIG_R; dy++) {
     for (let dx = -DIG_R; dx <= DIG_R; dx++) {
       if (dx * dx + dy * dy > DIG_R * DIG_R) continue;
       const x = gx + dx, y = gy + dy;
       if (x <= 0 || y <= 0 || x >= GRID_W - 1 || y >= GRID_H - 1) continue;
       const i = idx(x, y);
-      if (grid[i] === DIRT) grid[i] = EMPTY;
+      if (grid[i] === DIRT) { grid[i] = EMPTY; dugAny = true; }
     }
   }
+  return dugAny;
+}
+
+// ---- Digging sound ---------------------------------------------------------
+const digSound = new Audio('assets/dig_sand.mp3');
+digSound.loop = true;
+digSound.volume = 0.55;
+function startDigSound() {
+  if (digSound.paused) {
+    digSound.currentTime = 0;
+    digSound.play().catch(() => {});
+  }
+}
+function stopDigSound() {
+  if (!digSound.paused) digSound.pause();
 }
 
 function pointerPos(e) {
@@ -217,24 +239,29 @@ function onPointerDown(e) {
   dragging = true;
   const [cx, cy] = pointerPos(e);
   const [gx, gy] = stageToGrid(cx, cy);
-  digAt(gx, gy);
+  const dug = digAt(gx, gy);
+  if (dug) startDigSound(); else stopDigSound();
   e.preventDefault();
 }
 function onPointerMove(e) {
   if (!dragging || ended) return;
   const [cx, cy] = pointerPos(e);
   const [gx, gy] = stageToGrid(cx, cy);
-  digAt(gx, gy);
+  const dug = digAt(gx, gy);
+  if (dug) startDigSound(); else stopDigSound();
   e.preventDefault();
 }
-function onPointerUp() { dragging = false; }
+function onPointerUp() { dragging = false; stopDigSound(); }
 
 stage.addEventListener('mousedown', onPointerDown);
 stage.addEventListener('mousemove', onPointerMove);
 window.addEventListener('mouseup', onPointerUp);
+stage.addEventListener('mouseleave', stopDigSound);
 stage.addEventListener('touchstart', onPointerDown, { passive: false });
 stage.addEventListener('touchmove', onPointerMove, { passive: false });
 window.addEventListener('touchend', onPointerUp);
+window.addEventListener('touchcancel', onPointerUp);
+window.addEventListener('blur', stopDigSound);
 
 // ---- Fluid simulation --------------------------------------------------
 function moveCell(x, y, val) {
@@ -334,12 +361,29 @@ function collectZones() {
 }
 
 function spawnParticle(gx, gy, color) {
-  if (particles.length > 120) return;
+  if (particles.length > 160) return;
   for (let k = 0; k < 3; k++) {
     particles.push({
       x: gx * CELL + CELL / 2, y: gy * CELL + CELL / 2,
       vx: (Math.random() - 0.5) * 2.2, vy: -Math.random() * 2.2 - 0.5,
-      life: 24, color
+      life: 24, maxLife: 24, size: 2.2, color
+    });
+  }
+}
+
+// Golden confetti burst for the "Cartman is happy" celebration
+function spawnCelebrationBurst() {
+  const cx = (CARTMAN_BOX.x0 + CARTMAN_BOX.x1) / 2 * CELL;
+  const cy = (CARTMAN_BOX.y0 + CARTMAN_BOX.y1) / 2 * CELL;
+  const colors = ['#ffd23f', '#ffef9f', '#ff9f43', '#fff6d9'];
+  for (let k = 0; k < 36; k++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 3.5;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1.5,
+      life: 55, maxLife: 55, size: 2.5 + Math.random() * 2,
+      color: colors[k % colors.length]
     });
   }
 }
@@ -374,6 +418,7 @@ function checkEnd() {
 
 function finishLevel() {
   ended = true;
+  stopDigSound();
   const { bluePct, purplePct } = updateHud();
   const win = bluePct >= WIN_BLUE_PCT;
   let stars = 0;
@@ -414,16 +459,52 @@ function drawBackground() {
   if (cartmanLoaded) {
     const bx = CARTMAN_BOX.x0 * CELL, by = CARTMAN_BOX.y0 * CELL;
     const bw = (CARTMAN_BOX.x1 - CARTMAN_BOX.x0) * CELL, bh = (CARTMAN_BOX.y1 - CARTMAN_BOX.y0) * CELL;
+    const cx = bx + bw / 2, cy = by + bh / 2;
+    const happy = currentBluePct >= 50;
+
+    // soft golden glow once more than half the water has reached him
+    if (happy) {
+      const pulse = 0.55 + 0.25 * Math.sin(frameCount * 0.08);
+      const glowR = Math.max(bw, bh) * 0.75;
+      const glow = bgCtx.createRadialGradient(cx, cy, glowR * 0.2, cx, cy, glowR);
+      glow.addColorStop(0, `rgba(255,214,90,${0.55 * pulse})`);
+      glow.addColorStop(1, 'rgba(255,214,90,0)');
+      bgCtx.fillStyle = glow;
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      bgCtx.fill();
+    }
+
+    // one-shot elastic bounce/wiggle the instant the 50% mark is crossed
+    let scale = 1, rotate = 0;
+    if (celebrateFrame >= 0) {
+      const t = frameCount - celebrateFrame;
+      const decay = Math.exp(-t * 0.05);
+      if (decay > 0.02) {
+        scale = 1 + 0.22 * Math.sin(t * 0.4) * decay;
+        rotate = Math.sin(t * 0.55) * 0.1 * decay;
+      }
+    }
+
+    bgCtx.save();
+    bgCtx.translate(cx, cy);
+    bgCtx.rotate(rotate);
+    bgCtx.scale(scale, scale);
+    bgCtx.translate(-cx, -cy);
+
     bgCtx.save();
     bgCtx.beginPath();
     roundRect(bgCtx, bx - 4, by - 4, bw + 8, bh + 8, 10);
     bgCtx.clip();
     bgCtx.drawImage(cartmanImg, bx, by - 6, bw, bh + 12);
     bgCtx.restore();
-    bgCtx.strokeStyle = '#ffcc33';
-    bgCtx.lineWidth = 3;
+
+    bgCtx.strokeStyle = happy ? '#fff2b0' : '#ffcc33';
+    bgCtx.lineWidth = happy ? 4 : 3;
     roundRect(bgCtx, bx - 4, by - 4, bw + 8, bh + 8, 10);
     bgCtx.stroke();
+
+    bgCtx.restore();
   }
 }
 
@@ -573,27 +654,38 @@ function paintMaskedTexture(maskCanvas, texCanvas, driftX, driftY) {
 function renderFx() {
   fxCtx.clearRect(0, 0, BG_W, BG_H);
   for (const p of particles) {
-    fxCtx.globalAlpha = Math.max(0, p.life / 24);
+    fxCtx.globalAlpha = Math.max(0, p.life / p.maxLife);
     fxCtx.fillStyle = p.color;
     fxCtx.beginPath();
-    fxCtx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+    fxCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     fxCtx.fill();
   }
   fxCtx.globalAlpha = 1;
 }
 
 // ---- Main loop -------------------------------------------------------
+function checkCelebration(bluePct) {
+  if (!celebrated50 && bluePct >= 50) {
+    celebrated50 = true;
+    celebrateFrame = frameCount;
+    spawnCelebrationBurst();
+  }
+}
+
 function tick() {
   if (!ended) {
     spawnSources();
     stepSimulation();
     collectZones();
-    updateHud();
+    const { bluePct } = updateHud();
+    currentBluePct = bluePct;
+    checkCelebration(bluePct);
     checkEnd();
     frameCount++;
   }
   renderSim();
   renderWater();
+  drawBackground();
   updateParticles();
   renderFx();
   requestAnimationFrame(tick);
