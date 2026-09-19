@@ -52,6 +52,33 @@ html, body {
   white-space: nowrap;
 }
 
+.duck-tracker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #071118;
+  border: 2px solid #04262d;
+  border-radius: 10px;
+  padding: 3px 6px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.6);
+  flex-shrink: 0;
+}
+
+.duck-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: grayscale(1) brightness(.55);
+  opacity: .55;
+  transition: filter .25s ease, opacity .25s ease, transform .25s ease;
+}
+
+.duck-icon.collected {
+  filter: none;
+  opacity: 1;
+  transform: scale(1.15);
+}
+
 .meter {
   display: flex;
   align-items: center;
@@ -167,6 +194,9 @@ html, body {
 }
 
 @media (max-width: 600px) {
+  #hud { flex-wrap: wrap; row-gap: 6px; }
   .hud-title { font-size: 14px; }
   #hint { font-size: 11px; padding: 0 6px; }
+  .duck-icon { width: 17px; height: 17px; }
+  .meter { flex-basis: 100%; }
 }

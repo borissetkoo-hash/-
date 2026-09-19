@@ -57,6 +57,15 @@ const PURPLE_BUDGET = 1000;
 const WIN_BLUE_PCT = 80;
 const SETTLE_FRAMES = 300; // ~5s at 60fps after budgets run out
 
+// Rubber ducks: collectible bonus items sitting in glowing wall niches,
+// like the originals — any liquid passing near one collects it.
+const DUCKS = [
+  { x: 36, y: 19 },
+  { x: 83, y: 74 },
+  { x: 126, y: 44 },
+];
+const DUCK_COLLECT_RADIUS = 5;
+
 // ---- State ---------------------------------------------------------------
 let grid, flow, processed;
 let blueRemaining, purpleRemaining, blueCollected, purpleCollected;
@@ -67,6 +76,8 @@ let particles = [];
 let celebrated50 = false;   // one-shot "Cartman is happy" trigger at 50% blue collected
 let celebrateFrame = -1;    // frame the celebration burst started, -1 = inactive
 let currentBluePct = 0;
+let duckCollected = 0;
+let duckState = []; // per-duck { collected, popFrame }
 
 // Both taps start shut — like the original game, you tap the valve to
 // open it instead of water just appearing at level start.
@@ -114,6 +125,11 @@ const buttersImg = new Image();
 let buttersLoaded = false;
 buttersImg.onload = () => { buttersLoaded = true; drawBackground(); };
 buttersImg.src = 'assets/butters.jpg';
+
+const duckImg = new Image();
+let duckLoaded = false;
+duckImg.onload = () => { duckLoaded = true; };
+duckImg.src = 'assets/duck.png';
 
 // ---- Manual HSL recolor -----------------------------------------------
 // Recolors a photo toward purple by hand (getImageData + HSL math)
@@ -298,7 +314,15 @@ function buildLevel() {
   purpleOn = false;
   blueTapFrame = -1;
   purpleTapFrame = -1;
+  duckCollected = 0;
+  duckState = DUCKS.map(() => ({ collected: false, popFrame: -1 }));
+  updateDuckTracker();
   updateHud();
+}
+
+function updateDuckTracker() {
+  const icons = document.querySelectorAll('.duck-icon');
+  icons.forEach((el, i) => el.classList.toggle('collected', !!(duckState[i] && duckState[i].collected)));
 }
 
 function clearBoxAboveWall(box, wall) {
@@ -519,6 +543,32 @@ function collectZones() {
   }
 }
 
+function collectDucks() {
+  for (let d = 0; d < DUCKS.length; d++) {
+    const state = duckState[d];
+    if (!state || state.collected) continue;
+    const duck = DUCKS[d];
+    const r = DUCK_COLLECT_RADIUS;
+    let touched = false;
+    for (let y = duck.y - r; y <= duck.y + r && !touched; y++) {
+      if (y < 0 || y >= GRID_H) continue;
+      for (let x = duck.x - r; x <= duck.x + r; x++) {
+        if (x < 0 || x >= GRID_W) continue;
+        if ((x - duck.x) ** 2 + (y - duck.y) ** 2 > r * r) continue;
+        const v = grid[idx(x, y)];
+        if (v === WATER || v === PURPLE) { touched = true; break; }
+      }
+    }
+    if (touched) {
+      state.collected = true;
+      state.popFrame = frameCount;
+      duckCollected++;
+      spawnCelebrationBurst(duck.x, duck.y, ['#fff6c9', '#ffd23f', '#ff9f43', '#ffffff']);
+      updateDuckTracker();
+    }
+  }
+}
+
 function spawnParticle(gx, gy, color) {
   if (particles.length > 160) return;
   for (let k = 0; k < 3; k++) {
@@ -531,10 +581,10 @@ function spawnParticle(gx, gy, color) {
 }
 
 // Golden confetti burst for the "Cartman is happy" celebration
-function spawnCelebrationBurst() {
-  const cx = (CARTMAN_BOX.x0 + CARTMAN_BOX.x1) / 2 * CELL;
-  const cy = (CARTMAN_BOX.y0 + CARTMAN_BOX.y1) / 2 * CELL;
-  const colors = ['#ffd23f', '#ffef9f', '#ff9f43', '#fff6d9'];
+function spawnCelebrationBurst(gx, gy, colors) {
+  const cx = gx !== undefined ? gx * CELL : (CARTMAN_BOX.x0 + CARTMAN_BOX.x1) / 2 * CELL;
+  const cy = gy !== undefined ? gy * CELL : (CARTMAN_BOX.y0 + CARTMAN_BOX.y1) / 2 * CELL;
+  colors = colors || ['#ffd23f', '#ffef9f', '#ff9f43', '#fff6d9'];
   for (let k = 0; k < 36; k++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1.5 + Math.random() * 3.5;
@@ -588,7 +638,7 @@ function finishLevel() {
   }
   overlayTitle.textContent = win ? 'Уровень пройден!' : 'Картман остался без воды!';
   overlayStars.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  overlayText.textContent = `Синей воды собрано: ${bluePct}% · Фиолетовой у Баттерса: ${purplePct}%`;
+  overlayText.textContent = `Синей воды собрано: ${bluePct}% · Фиолетовой у Баттерса: ${purplePct}% · Уточек: ${duckCollected}/${DUCKS.length}`;
   overlayBtn.textContent = win ? 'Играть снова' : 'Попробовать снова';
   overlay.classList.remove('hidden');
 }
@@ -858,10 +908,63 @@ function renderFaucet(key) {
   fxCtx.restore();
 }
 
+function renderDucks() {
+  if (!duckLoaded) return;
+  for (let d = 0; d < DUCKS.length; d++) {
+    const duck = DUCKS[d];
+    const state = duckState[d];
+    if (!state) continue;
+    const cx = duck.x * CELL + CELL / 2, cy = duck.y * CELL + CELL / 2;
+
+    if (state.collected) {
+      const t = frameCount - state.popFrame;
+      if (t > 26) continue; // finished popping, gone for good
+      const grow = 1 + t * 0.09;
+      const fade = Math.max(0, 1 - t / 26);
+      fxCtx.save();
+      fxCtx.globalAlpha = fade;
+      fxCtx.translate(cx, cy);
+      fxCtx.scale(grow, grow);
+      fxCtx.drawImage(duckImg, -11, -11, 22, 22);
+      fxCtx.restore();
+      continue;
+    }
+
+    // glowing wall niche, like the original game's duck sockets
+    const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.05 + d);
+    const glow = fxCtx.createRadialGradient(cx, cy, 1, cx, cy, 15 + 2 * pulse);
+    glow.addColorStop(0, `rgba(150, 230, 210, ${0.55 + 0.2 * pulse})`);
+    glow.addColorStop(0.55, 'rgba(60, 130, 130, 0.4)');
+    glow.addColorStop(1, 'rgba(20, 50, 60, 0)');
+    fxCtx.fillStyle = glow;
+    fxCtx.beginPath();
+    fxCtx.arc(cx, cy, 15 + 2 * pulse, 0, Math.PI * 2);
+    fxCtx.fill();
+
+    fxCtx.save();
+    fxCtx.beginPath();
+    fxCtx.arc(cx, cy, 11, 0, Math.PI * 2);
+    fxCtx.clip();
+    fxCtx.fillStyle = '#0e2a2e';
+    fxCtx.fill();
+    fxCtx.restore();
+
+    fxCtx.strokeStyle = 'rgba(190, 245, 230, 0.85)';
+    fxCtx.lineWidth = 1.5;
+    fxCtx.beginPath();
+    fxCtx.arc(cx, cy, 11, 0, Math.PI * 2);
+    fxCtx.stroke();
+
+    const bob = Math.sin(frameCount * 0.06 + d * 2) * 1.2;
+    fxCtx.drawImage(duckImg, cx - 9, cy - 9 + bob, 18, 18);
+  }
+}
+
 function renderFx() {
   fxCtx.clearRect(0, 0, BG_W, BG_H);
   renderFaucet('blue');
   renderFaucet('purple');
+  renderDucks();
   for (const p of particles) {
     fxCtx.globalAlpha = Math.max(0, p.life / p.maxLife);
     fxCtx.fillStyle = p.color;
@@ -886,6 +989,7 @@ function tick() {
     spawnSources();
     stepSimulation();
     collectZones();
+    collectDucks();
     const { bluePct } = updateHud();
     currentBluePct = bluePct;
     checkCelebration(bluePct);
