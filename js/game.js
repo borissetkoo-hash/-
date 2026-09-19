@@ -124,6 +124,28 @@ waterTexImg.onload = () => {
 };
 waterTexImg.src = 'assets/water_texture.jpg';
 
+// ---- Faucet decoration (real photo, recolored for the purple spout) -----
+let blueFaucetCanvas = null, purpleFaucetCanvas = null, faucetReady = false;
+const faucetImg = new Image();
+faucetImg.onload = () => {
+  blueFaucetCanvas = document.createElement('canvas');
+  blueFaucetCanvas.width = faucetImg.naturalWidth;
+  blueFaucetCanvas.height = faucetImg.naturalHeight;
+  blueFaucetCanvas.getContext('2d').drawImage(faucetImg, 0, 0);
+
+  purpleFaucetCanvas = document.createElement('canvas');
+  purpleFaucetCanvas.width = faucetImg.naturalWidth;
+  purpleFaucetCanvas.height = faucetImg.naturalHeight;
+  const pctx = purpleFaucetCanvas.getContext('2d');
+  pctx.filter = 'hue-rotate(95deg) saturate(1.4) brightness(1.02)';
+  pctx.drawImage(faucetImg, 0, 0);
+  pctx.filter = 'none';
+
+  faucetReady = true;
+  drawBackground();
+};
+faucetImg.src = 'assets/faucet.webp';
+
 // ---- Level construction ---------------------------------------------------
 function idx(x, y) { return y * GRID_W + x; }
 
@@ -469,8 +491,6 @@ function drawBackground() {
   bgCtx.fillStyle = g;
   bgCtx.fillRect(0, 0, BG_W, BG_H);
 
-  drawPipe(BLUE_GAP, '#3f7a3a', '#2c5a29');
-  drawPipe(PURPLE_GAP, '#6f4f8a', '#4d3563');
 
   if (buttersLoaded) {
     const bx = BUTTERS_BOX.x0 * CELL, by = BUTTERS_BOX.y0 * CELL;
@@ -549,12 +569,15 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawPipe(gap, colorA, colorB) {
-  const x0 = gap[0] * CELL, w = (gap[1] - gap[0]) * CELL;
-  bgCtx.fillStyle = colorB;
-  bgCtx.fillRect(x0 - 6, -10, w + 12, 40);
-  bgCtx.fillStyle = colorA;
-  bgCtx.fillRect(x0, -10, w, 46);
+// Draws the faucet photo sitting just above the spout gap, its nozzle
+// (the image's left end) lined up over the opening. Drawn on the topmost
+// layer (with the particles) so the dirt underneath never covers it.
+function drawFaucet(ctx, gap, texCanvas) {
+  const cx = (gap[0] + gap[1]) / 2 * CELL;
+  const w = 84;
+  const h = w * (texCanvas.height / texCanvas.width);
+  const nozzleInset = w * 0.1; // the nozzle sits slightly inside the image's left edge
+  ctx.drawImage(texCanvas, cx - nozzleInset, 1, w, h);
 }
 
 let simImageData = simCtx.createImageData(GRID_W, GRID_H);
@@ -655,6 +678,10 @@ function paintMaskedTexture(maskCanvas, texCanvas, driftX, driftY) {
 
 function renderFx() {
   fxCtx.clearRect(0, 0, BG_W, BG_H);
+  if (faucetReady) {
+    drawFaucet(fxCtx, BLUE_GAP, blueFaucetCanvas);
+    drawFaucet(fxCtx, PURPLE_GAP, purpleFaucetCanvas);
+  }
   for (const p of particles) {
     fxCtx.globalAlpha = Math.max(0, p.life / p.maxLife);
     fxCtx.fillStyle = p.color;
