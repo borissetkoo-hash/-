@@ -184,6 +184,11 @@ function buildLevel() {
     for (let x = MOUTH_INTERIOR.x0; x < MOUTH_INTERIOR.x1; x++) grid[idx(x, y)] = EMPTY;
   }
 
+  // Clear the dirt directly above each basin too, matching the portrait's
+  // own box — otherwise undug dirt renders over the top of their faces.
+  clearBoxAboveWall(CARTMAN_BOX, MOUTH_WALL);
+  clearBoxAboveWall(BUTTERS_BOX, CUP_WALL);
+
   blueRemaining = BLUE_BUDGET;
   purpleRemaining = PURPLE_BUDGET;
   blueCollected = 0;
@@ -197,6 +202,15 @@ function buildLevel() {
   celebrated50 = false;
   celebrateFrame = -1;
   updateHud();
+}
+
+function clearBoxAboveWall(box, wall) {
+  for (let y = box.y0; y < wall.y0; y++) {
+    for (let x = box.x0; x < box.x1; x++) {
+      if (x <= 0 || y <= 0 || x >= GRID_W - 1 || y >= GRID_H - 1) continue;
+      grid[idx(x, y)] = EMPTY;
+    }
+  }
 }
 
 // ---- Digging ---------------------------------------------------------------
