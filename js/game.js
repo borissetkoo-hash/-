@@ -58,16 +58,20 @@ let frameCount = 0;
 let particles = [];
 
 const bgCanvas = document.getElementById('bgCanvas');
+const waterCanvas = document.getElementById('waterCanvas');
 const simCanvas = document.getElementById('simCanvas');
 const fxCanvas = document.getElementById('fxCanvas');
 const bgCtx = bgCanvas.getContext('2d');
+const waterCtx = waterCanvas.getContext('2d', { alpha: true });
 const simCtx = simCanvas.getContext('2d', { alpha: true });
 const fxCtx = fxCanvas.getContext('2d');
 
 bgCanvas.width = BG_W; bgCanvas.height = BG_H;
+waterCanvas.width = BG_W; waterCanvas.height = BG_H;
 simCanvas.width = GRID_W; simCanvas.height = GRID_H;
 fxCanvas.width = BG_W; fxCanvas.height = BG_H;
 simCtx.imageSmoothingEnabled = false;
+waterCtx.imageSmoothingEnabled = true;
 
 const bluePctEl = document.getElementById('bluePct');
 const purplePctEl = document.getElementById('purplePct');
@@ -85,6 +89,28 @@ const cartmanImg = new Image();
 let cartmanLoaded = false;
 cartmanImg.onload = () => { cartmanLoaded = true; drawBackground(); };
 cartmanImg.src = 'assets/cartman.jpg';
+
+// ---- Water texture (real photo, recolored for the purple liquid) --------
+let blueTexCanvas = null, purpleTexCanvas = null, texReady = false;
+const waterTexImg = new Image();
+waterTexImg.onload = () => {
+  blueTexCanvas = document.createElement('canvas');
+  blueTexCanvas.width = waterTexImg.naturalWidth;
+  blueTexCanvas.height = waterTexImg.naturalHeight;
+  blueTexCanvas.getContext('2d').drawImage(waterTexImg, 0, 0);
+
+  purpleTexCanvas = document.createElement('canvas');
+  purpleTexCanvas.width = waterTexImg.naturalWidth;
+  purpleTexCanvas.height = waterTexImg.naturalHeight;
+  const pctx = purpleTexCanvas.getContext('2d');
+  // shift the same caustics photo from blue toward purple/magenta
+  pctx.filter = 'hue-rotate(95deg) saturate(1.4) brightness(1.02)';
+  pctx.drawImage(waterTexImg, 0, 0);
+  pctx.filter = 'none';
+
+  texReady = true;
+};
+waterTexImg.src = 'assets/water_texture.jpg';
 
 // ---- Level construction ---------------------------------------------------
 function idx(x, y) { return y * GRID_W + x; }
@@ -450,6 +476,8 @@ function drawPipe(gap, colorA, colorB) {
 
 let simImageData = simCtx.createImageData(GRID_W, GRID_H);
 function renderSim() {
+  // dirt & rock only — water/purple are rendered separately as a real
+  // photo texture (see renderWater), clipped to their grid cells
   const data = simImageData.data;
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
@@ -464,17 +492,82 @@ function renderSim() {
         const shade = (x * 3 + y) % 7 === 0;
         r = gC = b = shade ? 0x60 : 0x4a; a = 255;
         b += 6;
-      } else if (v === WATER) {
-        const surface = grid[idx(x, y - 1)] === EMPTY;
-        r = surface ? 0x8f : 0x35; gC = surface ? 0xe3 : 0xb6; b = surface ? 0xff : 0xff; a = 235;
-      } else if (v === PURPLE) {
-        const surface = grid[idx(x, y - 1)] === EMPTY;
-        r = surface ? 0xd0 : 0xa2; gC = surface ? 0x9a : 0x4f; b = surface ? 0xff : 0xe0; a = 235;
       }
       data[p] = r; data[p + 1] = gC; data[p + 2] = b; data[p + 3] = a;
     }
   }
   simCtx.putImageData(simImageData, 0, 0);
+}
+
+// Low-res binary masks (one per liquid) rasterized from the grid, then
+// scaled up with smoothing so tunnel edges look soft instead of blocky.
+const blueMaskCanvas = document.createElement('canvas');
+const purpleMaskCanvas = document.createElement('canvas');
+blueMaskCanvas.width = purpleMaskCanvas.width = GRID_W;
+blueMaskCanvas.height = purpleMaskCanvas.height = GRID_H;
+const blueMaskCtx = blueMaskCanvas.getContext('2d');
+const purpleMaskCtx = purpleMaskCanvas.getContext('2d');
+let blueMaskData = blueMaskCtx.createImageData(GRID_W, GRID_H);
+let purpleMaskData = purpleMaskCtx.createImageData(GRID_W, GRID_H);
+
+const waterTempCanvas = document.createElement('canvas');
+waterTempCanvas.width = BG_W; waterTempCanvas.height = BG_H;
+const waterTempCtx = waterTempCanvas.getContext('2d');
+
+// scratch canvas for the fully-tiled texture, built fresh per liquid per
+// frame, then stamped onto the mask with a *single* source-in draw
+// (several source-in draws in a row would AND their coverage together
+// instead of OR-ing it, erasing everything outside the last tile)
+const tiledTexCanvas = document.createElement('canvas');
+tiledTexCanvas.width = BG_W; tiledTexCanvas.height = BG_H;
+const tiledTexCtx = tiledTexCanvas.getContext('2d');
+
+function renderWater() {
+  waterCtx.clearRect(0, 0, BG_W, BG_H);
+  if (!texReady) return;
+
+  const bData = blueMaskData.data, pData = purpleMaskData.data;
+  for (let i = 0; i < grid.length; i++) {
+    const p = i * 4;
+    const isBlue = grid[i] === WATER;
+    const isPurple = grid[i] === PURPLE;
+    bData[p + 3] = isBlue ? 255 : 0;
+    pData[p + 3] = isPurple ? 255 : 0;
+  }
+  blueMaskCtx.putImageData(blueMaskData, 0, 0);
+  purpleMaskCtx.putImageData(purpleMaskData, 0, 0);
+
+  paintMaskedTexture(blueMaskCanvas, blueTexCanvas, frameCount * 0.15, frameCount * 0.05);
+  paintMaskedTexture(purpleMaskCanvas, purpleTexCanvas, frameCount * 0.12, -frameCount * 0.04);
+}
+
+const TEX_TILE_W = 100; // on-screen tile size — small enough to show ripple variety inside a narrow dug tunnel
+function buildTiledTexture(texCanvas, driftX, driftY) {
+  tiledTexCtx.globalCompositeOperation = 'source-over';
+  tiledTexCtx.clearRect(0, 0, BG_W, BG_H);
+  const tw = TEX_TILE_W;
+  const th = TEX_TILE_W * (texCanvas.height / texCanvas.width);
+  const startX = -(driftX % tw) - tw;
+  const startY = -(driftY % th) - th;
+  for (let y = startY; y < BG_H; y += th) {
+    for (let x = startX; x < BG_W; x += tw) {
+      tiledTexCtx.drawImage(texCanvas, x, y, tw, th);
+    }
+  }
+}
+
+function paintMaskedTexture(maskCanvas, texCanvas, driftX, driftY) {
+  waterTempCtx.globalCompositeOperation = 'source-over';
+  waterTempCtx.clearRect(0, 0, BG_W, BG_H);
+  waterTempCtx.imageSmoothingEnabled = true;
+  waterTempCtx.drawImage(maskCanvas, 0, 0, BG_W, BG_H);
+
+  buildTiledTexture(texCanvas, driftX, driftY);
+  waterTempCtx.globalCompositeOperation = 'source-in';
+  waterTempCtx.drawImage(tiledTexCanvas, 0, 0);
+  waterTempCtx.globalCompositeOperation = 'source-over';
+
+  waterCtx.drawImage(waterTempCanvas, 0, 0);
 }
 
 function renderFx() {
@@ -500,6 +593,7 @@ function tick() {
     frameCount++;
   }
   renderSim();
+  renderWater();
   updateParticles();
   renderFx();
   requestAnimationFrame(tick);
