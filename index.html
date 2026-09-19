@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cartman's Water — копия Where's My Water?</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <div class="hud-title">Cartman's&nbsp;Water</div>
+
+      <div class="meter">
+        <span class="meter-icon meter-icon-blue">💧</span>
+        <div class="meter-bar">
+          <div id="blueFill" class="meter-fill meter-fill-blue"></div>
+        </div>
+        <span id="bluePct" class="meter-pct">0%</span>
+      </div>
+
+      <div class="meter">
+        <span class="meter-icon meter-icon-purple">🟣</span>
+        <div class="meter-bar">
+          <div id="purpleFill" class="meter-fill meter-fill-purple"></div>
+        </div>
+        <span id="purplePct" class="meter-pct">0%</span>
+      </div>
+
+      <button id="resetBtn" title="Начать уровень заново">⟲ Заново</button>
+    </header>
+
+    <div id="stage">
+      <canvas id="bgCanvas"></canvas>
+      <canvas id="simCanvas"></canvas>
+      <canvas id="fxCanvas"></canvas>
+
+      <div id="overlay" class="hidden">
+        <div id="overlayCard">
+          <h2 id="overlayTitle">Уровень пройден!</h2>
+          <div id="overlayStars">★ ★ ★</div>
+          <p id="overlayText"></p>
+          <button id="overlayBtn">Играть снова</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="hint">Проведите пальцем/мышью по земле, чтобы прокопать туннель для воды. Синяя вода должна попасть в рот Картману, фиолетовая — в чашу слева.</p>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
