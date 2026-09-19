@@ -115,6 +115,67 @@ let buttersLoaded = false;
 buttersImg.onload = () => { buttersLoaded = true; drawBackground(); };
 buttersImg.src = 'assets/butters.jpg';
 
+// ---- Manual HSL recolor -----------------------------------------------
+// Recolors a photo toward purple by hand (getImageData + HSL math)
+// instead of canvas ctx.filter — filter's hue-rotate/saturate support is
+// inconsistent across renderers (some silently no-op it), which left the
+// "purple" spout/water looking identical to the blue one on some devices.
+// This works anywhere 2D canvas ImageData works, no filter API needed.
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d !== 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h, s, l];
+}
+function hslToRgb(h, s, l) {
+  if (s === 0) { const v = l * 255; return [v, v, v]; }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [hue2rgb(p, q, h + 1 / 3) * 255, hue2rgb(p, q, h) * 255, hue2rgb(p, q, h - 1 / 3) * 255];
+}
+// Shifts hue by hueDeg and pushes saturation toward satTarget (a floor,
+// not a multiplier, so even the source photo's pale pixels end up clearly
+// colored instead of stopping at "a bit more saturated than before").
+function recolorToPurple(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  const hueShift = 95 / 360;
+  for (let i = 0; i < d.length; i += 4) {
+    const [h0, s0, l0] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+    const h1 = (h0 + hueShift) % 1;
+    const s1 = Math.min(1, Math.max(s0, 0.55));
+    const l1 = Math.min(0.92, l0 * 0.98);
+    const [r, g, b] = hslToRgb(h1, s1, l1);
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return c;
+}
+
 // ---- Water texture (real photo, recolored for the purple liquid) --------
 let blueTexCanvas = null, purpleTexCanvas = null, texReady = false;
 const waterTexImg = new Image();
@@ -124,17 +185,7 @@ waterTexImg.onload = () => {
   blueTexCanvas.height = waterTexImg.naturalHeight;
   blueTexCanvas.getContext('2d').drawImage(waterTexImg, 0, 0);
 
-  purpleTexCanvas = document.createElement('canvas');
-  purpleTexCanvas.width = waterTexImg.naturalWidth;
-  purpleTexCanvas.height = waterTexImg.naturalHeight;
-  const pctx = purpleTexCanvas.getContext('2d');
-  // shift the same caustics photo from blue toward purple/magenta — the
-  // source photo is fairly pale, so saturation is pushed hard to read as
-  // unmistakably purple even as a thin, sparse trickle right at the spout
-  pctx.filter = 'hue-rotate(95deg) saturate(3.6) contrast(1.15) brightness(0.92)';
-  pctx.drawImage(waterTexImg, 0, 0);
-  pctx.filter = 'none';
-
+  purpleTexCanvas = recolorToPurple(waterTexImg);
   texReady = true;
 };
 waterTexImg.src = 'assets/water_texture.jpg';
@@ -148,14 +199,7 @@ faucetImg.onload = () => {
   blueFaucetCanvas.height = faucetImg.naturalHeight;
   blueFaucetCanvas.getContext('2d').drawImage(faucetImg, 0, 0);
 
-  purpleFaucetCanvas = document.createElement('canvas');
-  purpleFaucetCanvas.width = faucetImg.naturalWidth;
-  purpleFaucetCanvas.height = faucetImg.naturalHeight;
-  const pctx = purpleFaucetCanvas.getContext('2d');
-  pctx.filter = 'hue-rotate(95deg) saturate(3.6) contrast(1.15) brightness(0.92)';
-  pctx.drawImage(faucetImg, 0, 0);
-  pctx.filter = 'none';
-
+  purpleFaucetCanvas = recolorToPurple(faucetImg);
   faucetReady = true;
   drawBackground();
 };
