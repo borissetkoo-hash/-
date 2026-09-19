@@ -33,9 +33,13 @@ const MOUTH_INTERIOR = { x0: MOUTH_WALL.x0 + 1, x1: MOUTH_WALL.x1 - 1, y0: MOUTH
 // Cartman's face and disappears roughly where his mouth is drawn.
 const MOUTH_ZONE = { x0: MOUTH_INTERIOR.x0, x1: MOUTH_INTERIOR.x1, y0: 108, y1: 119 };
 const CUP_WALL = { x0: 98, x1: 134, y0: 95, y1: 123 };
-const CUP_ZONE = { x0: CUP_WALL.x0 + 1, x1: CUP_WALL.x1 - 1, y0: CUP_WALL.y0 + 1, y1: CUP_WALL.y1 };
+const CUP_INTERIOR = { x0: CUP_WALL.x0 + 1, x1: CUP_WALL.x1 - 1, y0: CUP_WALL.y0 + 1, y1: CUP_WALL.y1 };
+// Collection band sits lower in the basin so purple water visibly falls
+// past Butters' face and disappears roughly where his mouth is drawn.
+const CUP_ZONE = { x0: CUP_INTERIOR.x0, x1: CUP_INTERIOR.x1, y0: 108, y1: 119 };
 
 const CARTMAN_BOX = { x0: 42, y0: 84, x1: 92, y1: 123 };
+const BUTTERS_BOX = { x0: 94, y0: 82, x1: 138, y1: 122 };
 
 // Full-width rock bands, each with a separate diggable gap for blue and for
 // purple, so a tunnel dug for one liquid never opens a shortcut for the other.
@@ -92,6 +96,11 @@ const cartmanImg = new Image();
 let cartmanLoaded = false;
 cartmanImg.onload = () => { cartmanLoaded = true; drawBackground(); };
 cartmanImg.src = 'assets/cartman.jpg';
+
+const buttersImg = new Image();
+let buttersLoaded = false;
+buttersImg.onload = () => { buttersLoaded = true; drawBackground(); };
+buttersImg.src = 'assets/butters.jpg';
 
 // ---- Water texture (real photo, recolored for the purple liquid) --------
 let blueTexCanvas = null, purpleTexCanvas = null, texReady = false;
@@ -161,8 +170,8 @@ function buildLevel() {
     grid[idx(CUP_WALL.x1 - 1, y)] = ROCK;
   }
   for (let x = CUP_WALL.x0; x < CUP_WALL.x1; x++) grid[idx(x, CUP_WALL.y1 - 1)] = ROCK;
-  for (let y = CUP_ZONE.y0; y < CUP_ZONE.y1; y++) {
-    for (let x = CUP_ZONE.x0; x < CUP_ZONE.x1; x++) grid[idx(x, y)] = EMPTY;
+  for (let y = CUP_INTERIOR.y0; y < CUP_INTERIOR.y1; y++) {
+    for (let x = CUP_INTERIOR.x0; x < CUP_INTERIOR.x1; x++) grid[idx(x, y)] = EMPTY;
   }
 
   // Cartman's mouth basin: same idea, positioned under his face
@@ -429,7 +438,7 @@ function finishLevel() {
   }
   overlayTitle.textContent = win ? 'Уровень пройден!' : 'Картман остался без воды!';
   overlayStars.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  overlayText.textContent = `Синей воды собрано: ${bluePct}% · Фиолетовой в чаше: ${purplePct}%`;
+  overlayText.textContent = `Синей воды собрано: ${bluePct}% · Фиолетовой у Баттерса: ${purplePct}%`;
   overlayBtn.textContent = win ? 'Играть снова' : 'Попробовать снова';
   overlay.classList.remove('hidden');
 }
@@ -449,12 +458,20 @@ function drawBackground() {
   drawPipe(BLUE_GAP, '#3f7a3a', '#2c5a29');
   drawPipe(PURPLE_GAP, '#6f4f8a', '#4d3563');
 
-  drawCupVessel();
-
-  // cup goal marker
-  bgCtx.font = '18px sans-serif';
-  bgCtx.textAlign = 'center';
-  bgCtx.fillText('🟣', (CUP_WALL.x0 + CUP_WALL.x1) / 2 * CELL, (CUP_WALL.y0 - 3) * CELL);
+  if (buttersLoaded) {
+    const bx = BUTTERS_BOX.x0 * CELL, by = BUTTERS_BOX.y0 * CELL;
+    const bw = (BUTTERS_BOX.x1 - BUTTERS_BOX.x0) * CELL, bh = (BUTTERS_BOX.y1 - BUTTERS_BOX.y0) * CELL;
+    bgCtx.save();
+    bgCtx.beginPath();
+    roundRect(bgCtx, bx - 4, by - 4, bw + 8, bh + 8, 10);
+    bgCtx.clip();
+    bgCtx.drawImage(buttersImg, bx, by - 6, bw, bh + 12);
+    bgCtx.restore();
+    bgCtx.strokeStyle = '#c7a4e8';
+    bgCtx.lineWidth = 3;
+    roundRect(bgCtx, bx - 4, by - 4, bw + 8, bh + 8, 10);
+    bgCtx.stroke();
+  }
 
   if (cartmanLoaded) {
     const bx = CARTMAN_BOX.x0 * CELL, by = CARTMAN_BOX.y0 * CELL;
@@ -506,35 +523,6 @@ function drawBackground() {
 
     bgCtx.restore();
   }
-}
-
-function drawCupVessel() {
-  const x = CUP_WALL.x0 * CELL, y = CUP_WALL.y0 * CELL;
-  const w = (CUP_WALL.x1 - CUP_WALL.x0) * CELL, h = (CUP_WALL.y1 - CUP_WALL.y0) * CELL;
-  bgCtx.save();
-  bgCtx.beginPath();
-  roundRect(bgCtx, x, y, w, h, 8);
-  bgCtx.clip();
-  const glass = bgCtx.createLinearGradient(x, 0, x + w, 0);
-  glass.addColorStop(0, 'rgba(120,70,150,0.35)');
-  glass.addColorStop(0.15, 'rgba(200,160,230,0.5)');
-  glass.addColorStop(0.5, 'rgba(90,50,120,0.28)');
-  glass.addColorStop(0.85, 'rgba(200,160,230,0.4)');
-  glass.addColorStop(1, 'rgba(90,50,120,0.35)');
-  bgCtx.fillStyle = glass;
-  bgCtx.fillRect(x, y, w, h);
-  // subtle glass highlight streak
-  bgCtx.fillStyle = 'rgba(255,255,255,0.15)';
-  bgCtx.fillRect(x + w * 0.18, y, w * 0.08, h);
-  bgCtx.restore();
-
-  bgCtx.strokeStyle = 'rgba(210,170,240,0.8)';
-  bgCtx.lineWidth = 3;
-  roundRect(bgCtx, x, y, w, h, 8);
-  bgCtx.stroke();
-  // rim
-  bgCtx.fillStyle = '#c7a4e8';
-  bgCtx.fillRect(x - 4, y - 6, w + 8, 8);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
