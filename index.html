@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Грибочек Бразерс</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky-top:#5c94fc;
+    --sky-bottom:#a7d8ff;
+    --ui-bg:#1b1b2a;
+    --ui-fg:#fff8e1;
+    --accent:#ffcc00;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:#000;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Press Start 2P',monospace;
+    overflow:hidden;
+    color:var(--ui-fg);
+  }
+  #wrap{
+    position:relative;
+    width:100%;
+    max-width:900px;
+    aspect-ratio:800/544;
+    background:#000;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    background:linear-gradient(var(--sky-top),var(--sky-bottom));
+    touch-action:none;
+  }
+  #hud{
+    position:absolute;top:0;left:0;right:0;
+    padding:10px 16px;
+    display:flex;justify-content:space-between;
+    font-size:11px;
+    letter-spacing:1px;
+    text-shadow:2px 2px 0 #000;
+    pointer-events:none;
+  }
+  #overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.72);
+    text-align:center;
+    gap:18px;
+    padding:20px;
+  }
+  #overlay.hidden{display:none;}
+  #overlay h1{
+    font-size:22px;color:var(--accent);
+    text-shadow:3px 3px 0 #7a3b00;
+    margin:0;
+    line-height:1.6;
+  }
+  #overlay p{
+    font-size:10px;
+    line-height:2;
+    margin:0;
+    max-width:480px;
+  }
+  #overlay button{
+    font-family:inherit;
+    font-size:12px;
+    padding:12px 22px;
+    background:var(--accent);
+    border:3px solid #7a3b00;
+    color:#3b2200;
+    cursor:pointer;
+    border-radius:4px;
+    box-shadow:0 4px 0 #7a3b00;
+  }
+  #overlay button:active{
+    transform:translateY(3px);
+    box-shadow:0 1px 0 #7a3b00;
+  }
+  #mushroomIcon{
+    width:72px;height:72px;
+    image-rendering:pixelated;
+  }
+  #touch{
+    position:absolute;bottom:0;left:0;right:0;
+    display:flex;justify-content:space-between;
+    padding:14px;
+    pointer-events:none;
+  }
+  #touch button{
+    pointer-events:auto;
+    width:64px;height:64px;
+    border-radius:50%;
+    border:2px solid #0006;
+    background:#ffffff33;
+    color:#fff;
+    font-size:18px;
+    font-family:inherit;
+    backdrop-filter:blur(2px);
+  }
+  #touch .left-pad{display:flex;gap:10px;}
+  @media (min-width:900px){
+    #touch{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="800" height="544"></canvas>
+  <div id="hud">
+    <span id="hudScore">СЧЁТ: 0</span>
+    <span id="hudLives">ЖИЗНИ: 3</span>
+  </div>
+
+  <div id="overlay">
+    <h1>ГРИБОЧЕК<br>БРАЗЕРС</h1>
+    <p>
+      Ты — маленький гриб, но прыгаешь как настоящий герой.<br>
+      ← → / A D — бег&nbsp;&nbsp;&nbsp; ПРОБЕЛ / ↑ / W — прыжок<br>
+      Прыгай на врагов сверху, бей блоки головой,<br>
+      добеги до флагштока в конце уровня!
+    </p>
+    <button id="startBtn">СТАРТ</button>
+  </div>
+
+  <div id="touch">
+    <div class="left-pad">
+      <button id="btnLeft">◀</button>
+      <button id="btnRight">▶</button>
+    </div>
+    <button id="btnJump">▲</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const TILE = 32;
+
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const hudScore = document.getElementById('hudScore');
+const hudLives = document.getElementById('hudLives');
+
+// ---------- Sun photo ----------
+const sunImg = new Image();
+sunImg.src = 'assets/sun.jpg';
+
+// ================= LEVEL DATA (inspired by classic World 1-1 layout) =================
+const ROWS = 17; // 17 * 32 = 544, leaves room for HUD margin (canvas 560)
+const GROUND_ROW = 13; // top row of ground surface
+const GROUND_DEPTH = 4; // rows of ground thickness
+
+// pits: [startCol, endCol] inclusive, no ground there
+const pits = [[46,48],[70,72]];
+
+function isPit(col){
+  return pits.some(p => col>=p[0] && col<=p[1]);
+}
+
+// blocks: row/col grid of breakable/question blocks
+// type: 'B' brick (breakable by head-bump), 'Q' question (gives coin), 'U' used question
+const blocks = [];
+function addBlock(col,row,type){ blocks.push({col,row,type, bump:0}); }
+
+// classic lone question block + the brick/question row
+addBlock(21,9,'Q');
+addBlock(23,5,'B'); addBlock(24,5,'Q'); addBlock(25,5,'B'); addBlock(26,5,'Q'); addBlock(27,5,'B');
+
+// mid-level brick+coin cluster
+addBlock(53,9,'B'); addBlock(54,9,'Q'); addBlock(55,9,'B'); addBlock(56,9,'Q');
+addBlock(54,5,'Q');
+
+addBlock(60,9,'B'); addBlock(61,9,'B'); addBlock(62,9,'Q'); addBlock(63,9,'B');
+
+// pipes: {col, height} occupies columns [col, col+1], sits on ground
+const pipes = [
+  {col:31, h:2},
+  {col:36, h:3},
+  {col:41, h:4},
+  {col:65, h:2},
+];
+
+// staircase before flagpole: ascending then descending, list of {col,height}
+const stairs = [];
+function addStair(startCol, heights, dir){
+  heights.forEach((h,i)=>{
+    stairs.push({col:startCol+i, h});
+  });
+}
+addStair(84, [1,2,3,4]); // ascend
+addStair(89, [4,3,2,1]); // descend (mirrors classic end stairs before pole)
+
+const FLAG_COL = 96;
+const LEVEL_END_COL = 108;
+const worldCols = LEVEL_END_COL + 4;
+const worldWidth = worldCols * TILE;
+
+// goombas: {x, alive, dir, baseY}
+const goombas = [
+  {x: 37*TILE, dir:-1},
+  {x: 38.5*TILE, dir:1},
+  {x: 57*TILE, dir:-1},
+  {x: 61.5*TILE, dir:1},
+  {x: 75*TILE, dir:-1},
+  {x: 76.5*TILE, dir:1},
+].map(g=>({...g, alive:true, y:0, w:28, h:26, vx: 0.9*g.dir, squish:0}));
+
+// coins popped animation list
+let popups = [];
+let flagSlide = 0;
+
+// ---------- Solid tile lookup ----------
+// returns true if the tile (col,row) is solid ground/pipe/block
+function groundTopAt(col){
+  if(isPit(col)) return Infinity;
+  return GROUND_ROW;
+}
+
+function pipeAt(col){
+  return pipes.find(p => col===p.col || col===p.col+1);
+}
+
+function solidBlockAt(col,row){
+  return blocks.find(b=>b.col===col && b.row===row);
+}
+function stairAt(col){
+  return stairs.find(s=>s.col===col);
+}
+
+// full solid test for a tile cell -> returns top-of-solid boolean plus source
+function isSolidCell(col,row){
+  if(col<0) return true; // left wall
+  const gTop = groundTopAt(col);
+  if(row>=gTop) return true;
+  const pipe = pipeAt(col);
+  if(pipe){
+    const pipeTopRow = GROUND_ROW - pipe.h;
+    if(row>=pipeTopRow && row<GROUND_ROW) return true;
+  }
+  const stair = stairAt(col);
+  if(stair){
+    const stairTopRow = GROUND_ROW - stair.h;
+    if(row>=stairTopRow && row<GROUND_ROW) return true;
+  }
+  const b = solidBlockAt(col,row);
+  if(b) return true;
+  return false;
+}
+
+// ================= PLAYER =================
+const player = {
+  x: 3*TILE, y: 0, w:26, h:30,
+  vx:0, vy:0,
+  onGround:false,
+  facing:1,
+  dead:false,
+  win:false,
+  bump:0,
+};
+let lives = 3;
+let score = 0;
+let checkpointX = 3*TILE;
+
+function resetPlayerPosition(){
+  player.x = checkpointX;
+  player.y = (GROUND_ROW*TILE) - player.h - 1;
+  player.vx=0; player.vy=0; player.dead=false;
+}
+
+// place player on ground initially
+player.y = (GROUND_ROW*TILE) - player.h - 1;
+
+// ================= INPUT =================
+const keys = {left:false,right:false,jump:false};
+window.addEventListener('keydown', e=>{
+  if(['ArrowLeft','KeyA'].includes(e.code)) keys.left=true;
+  if(['ArrowRight','KeyD'].includes(e.code)) keys.right=true;
+  if(['Space','ArrowUp','KeyW'].includes(e.code)){ keys.jump=true; e.preventDefault(); }
+});
+window.addEventListener('keyup', e=>{
+  if(['ArrowLeft','KeyA'].includes(e.code)) keys.left=false;
+  if(['ArrowRight','KeyD'].includes(e.code)) keys.right=false;
+  if(['Space','ArrowUp','KeyW'].includes(e.code)){ keys.jump=false; }
+});
+function bindHold(id, prop){
+  const el = document.getElementById(id);
+  const on = ev=>{ keys[prop]=true; ev.preventDefault(); };
+  const off = ev=>{ keys[prop]=false; ev.preventDefault(); };
+  el.addEventListener('touchstart',on); el.addEventListener('touchend',off);
+  el.addEventListener('mousedown',on); el.addEventListener('mouseup',off);
+  el.addEventListener('mouseleave',off);
+}
+bindHold('btnLeft','left');
+bindHold('btnRight','right');
+bindHold('btnJump','jump');
+
+// ================= GAME STATE =================
+let state = 'title'; // title | playing | win | dead | gameover
+let camX = 0;
+let jumpBuffered = false;
+let coyote = 0;
+let jumpHeld = false;
+
+startBtn.addEventListener('click', ()=>{
+  startGame();
+});
+
+function startGame(){
+  lives = 3; score = 0; checkpointX = 3*TILE;
+  resetPlayerPosition();
+  goombas.forEach((g,i)=>{ g.alive=true; g.squish=0; });
+  // restore original x positions
+  const initX = [37,38.5,57,61.5,75,76.5];
+  goombas.forEach((g,i)=>{ g.x = initX[i]*TILE; g.dir = (i%2===0)?-1:1; g.vx=0.9*g.dir; });
+  blocks.forEach(b=>{ if(b.type==='U') b.type='Q'; });
+  popups=[];
+  flagSlide=0;
+  state='playing';
+  overlay.classList.add('hidden');
+  updateHUD();
+}
+
+function updateHUD(){
+  hudScore.textContent = 'СЧЁТ: '+score;
+  hudLives.textContent = 'ЖИЗНИ: '+lives;
+}
+
+function showOverlay(title, text, btnText){
+  overlay.querySelector('h1').innerHTML = title;
+  overlay.querySelector('p').innerHTML = text;
+  startBtn.textContent = btnText;
+  overlay.classList.remove('hidden');
+}
+
+// ================= PHYSICS =================
+const GRAVITY = 0.62;
+const MAX_FALL = 14;
+const RUN_ACCEL = 0.55;
+const RUN_MAX = 4.4;
+const FRICTION = 0.5;
+const JUMP_V = -12.4;
+
+function rectsOverlap(ax,ay,aw,ah,bx,by,bw,bh){
+  return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+}
+
+function collideSolidsX(){
+  const col1 = Math.floor(player.x / TILE);
+  const col2 = Math.floor((player.x+player.w) / TILE);
+  const rowTop = Math.floor(player.y / TILE);
+  const rowBot = Math.floor((player.y+player.h-1) / TILE);
+  for(let r=rowTop;r<=rowBot;r++){
+    if(player.vx>0 && isSolidCell(col2,r)){
+      player.x = col2*TILE - player.w - 0.01;
+      player.vx=0;
+    } else if(player.vx<0 && isSolidCell(col1,r)){
+      player.x = (col1+1)*TILE + 0.01;
+      player.vx=0;
+    }
+  }
+}
+
+function hitBlockFromBelow(col,row){
+  const b = solidBlockAt(col,row);
+  if(!b) return;
+  if(b.type==='B'){
+    // break brick
+    const idx = blocks.indexOf(b);
+    blocks.splice(idx,1);
+    score += 50;
+    spawnPopup(col*TILE, row*TILE, '+50', '#fff');
+  } else if(b.type==='Q'){
+    b.type='U';
+    b.bump=6;
+    score += 100;
+    spawnPopup(col*TILE, row*TILE-6, 'coin', '#ffd700');
+  }
+}
+
+function collideSolidsY(){
+  player.onGround=false;
+  const col1 = Math.floor(player.x / TILE);
+  const col2 = Math.floor((player.x+player.w-1) / TILE);
+  if(player.vy>0){
+    const rowBot = Math.floor((player.y+player.h) / TILE);
+    for(let c=col1;c<=col2;c++){
+      if(isSolidCell(c,rowBot)){
+        player.y = rowBot*TILE - player.h - 0.01;
+        player.vy=0; player.onGround=true; coyote=6;
+      }
+    }
+  } else if(player.vy<0){
+    const rowTop = Math.floor(player.y / TILE);
+    for(let c=col1;c<=col2;c++){
+      if(isSolidCell(c,rowTop)){
+        player.y = (rowTop+1)*TILE + 0.01;
+        player.vy=0.5;
+        hitBlockFromBelow(c,rowTop);
+      }
+    }
+  }
+}
+
+function spawnPopup(x,y,text,color){
+  popups.push({x,y,text,color,life:40});
+}
+
+function die(){
+  if(player.dead) return;
+  player.dead = true;
+  lives -= 1;
+  updateHUD();
+  setTimeout(()=>{
+    if(lives<=0){
+      state='gameover';
+      showOverlay('ИГРА<br>ОКОНЧЕНА', 'Грибочек не справился в этот раз...<br>Счёт: '+score, 'ЕЩЁ РАЗ');
+    } else {
+      resetPlayerPosition();
+      state='playing';
+    }
+  }, 700);
+}
+
+function winLevel(){
+  if(player.win) return;
+  player.win=true;
+  score += 1000;
+  updateHUD();
+  setTimeout(()=>{
+    state='win';
+    showOverlay('УРОВЕНЬ<br>ПРОЙДЕН!', 'Грибочек добежал до флагштока!<br>Итоговый счёт: '+score, 'ИГРАТЬ СНОВА');
+  }, 1200);
+}
+
+function update(){
+  if(state!=='playing') return;
+
+  if(!player.dead && !player.win){
+    if(keys.left){ player.vx -= RUN_ACCEL; player.facing=-1; }
+    if(keys.right){ player.vx += RUN_ACCEL; player.facing=1; }
+    if(!keys.left && !keys.right){
+      if(player.vx>0) player.vx = Math.max(0, player.vx-FRICTION);
+      else if(player.vx<0) player.vx = Math.min(0, player.vx+FRICTION);
+    }
+    player.vx = Math.max(-RUN_MAX, Math.min(RUN_MAX, player.vx));
+
+    if(coyote>0) coyote--;
+    if(keys.jump && !jumpHeld && (player.onGround || coyote>0)){
+      player.vy = JUMP_V;
+      player.onGround=false;
+      coyote=0;
+    }
+    jumpHeld = keys.jump;
+
+    player.vy += GRAVITY;
+    if(player.vy>MAX_FALL) player.vy=MAX_FALL;
+
+    player.x += player.vx;
+    if(player.x<0) player.x=0;
+    collideSolidsX();
+    player.y += player.vy;
+    collideSolidsY();
+
+    if(player.y > ROWS*TILE){
+      die();
+    }
+
+    if(player.x >= FLAG_COL*TILE){
+      player.x = FLAG_COL*TILE;
+      winLevel();
+    }
+  }
+
+  // goombas
+  goombas.forEach(g=>{
+    if(!g.alive) return;
+    if(g.squish>0){ g.squish--; if(g.squish===0) g.alive=false; return; }
+    g.x += g.vx;
+    const col = Math.floor((g.x + (g.vx>0?g.w:0))/TILE);
+    const row = GROUND_ROW-1;
+    const aheadCol = g.vx>0 ? Math.floor((g.x+g.w)/TILE) : Math.floor((g.x-1)/TILE);
+    const belowSolid = isSolidCell(aheadCol, GROUND_ROW);
+    const wallAhead = isSolidCell(aheadCol, row);
+    if(wallAhead || !belowSolid){
+      g.dir *= -1; g.vx = 0.9*g.dir;
+    }
+  });
+
+  // player-goomba collisions
+  if(!player.dead && !player.win){
+    goombas.forEach(g=>{
+      if(!g.alive || g.squish>0) return;
+      if(rectsOverlap(player.x,player.y,player.w,player.h, g.x,(GROUND_ROW*TILE)-g.h,g.w,g.h)){
+        const playerBottom = player.y+player.h;
+        const goombaTop = (GROUND_ROW*TILE)-g.h;
+        if(player.vy>0 && playerBottom - goombaTop < 16){
+          g.squish = 18;
+          player.vy = -8;
+          score += 200;
+          spawnPopup(g.x, goombaTop-10, '+200', '#fff');
+        } else {
+          die();
+        }
+      }
+    });
+  }
+
+  popups.forEach(p=>{ p.y-=0.6; p.life--; });
+  popups = popups.filter(p=>p.life>0);
+
+  if(player.win && flagSlide < (GROUND_ROW*TILE - 2*TILE - 26)){
+    flagSlide += 4;
+  }
+
+  camX = Math.max(0, Math.min(worldWidth-W, player.x - W*0.4));
+}
+
+// ================= RENDER =================
+function drawGround(){
+  for(let col = Math.floor(camX/TILE)-1; col <= Math.floor((camX+W)/TILE)+1; col++){
+    if(isPit(col)) continue;
+    const x = col*TILE - camX;
+    for(let r=GROUND_ROW; r<GROUND_ROW+GROUND_DEPTH; r++){
+      const y = r*TILE;
+      ctx.fillStyle = r===GROUND_ROW ? '#c87137' : '#8b4a1e';
+      ctx.fillRect(x,y,TILE,TILE);
+      ctx.strokeStyle = 'rgba(0,0,0,.25)';
+      ctx.lineWidth=1;
+      ctx.strokeRect(x+0.5,y+0.5,TILE-1,TILE-1);
+      if(r===GROUND_ROW){
+        ctx.fillStyle='#e0995c';
+        ctx.fillRect(x,y,TILE,6);
+      }
+    }
+  }
+}
+
+function drawPipe(p){
+  const x = p.col*TILE - camX;
+  const topRow = GROUND_ROW - p.h;
+  const y = topRow*TILE;
+  const w = TILE*2;
+  const h = p.h*TILE;
+  ctx.fillStyle = '#2fa93a';
+  ctx.fillRect(x,y+10,w,h-10);
+  ctx.fillStyle = '#1f7d29';
+  ctx.fillRect(x,y,w,14);
+  ctx.fillStyle = '#4fd15c';
+  ctx.fillRect(x+4,y+3,8,h+7);
+  ctx.strokeStyle='#0d4d14';
+  ctx.lineWidth=2;
+  ctx.strokeRect(x+1,y+1,w-2,13);
+  ctx.strokeRect(x+1,y+11,w-2,h-11);
+}
+
+function drawStairBlock(col,row){
+  const x = col*TILE-camX, y=row*TILE;
+  ctx.fillStyle='#c87137';
+  ctx.fillRect(x,y,TILE,TILE);
+  ctx.strokeStyle='rgba(0,0,0,.3)';
+  ctx.strokeRect(x+0.5,y+0.5,TILE-1,TILE-1);
+}
+
+function drawBlock(b){
+  const x = b.col*TILE-camX;
+  const y = b.row*TILE - (b.bump>0?4:0);
+  if(b.bump>0) b.bump--;
+  if(b.type==='B'){
+    ctx.fillStyle='#c96a2e';
+    ctx.fillRect(x,y,TILE,TILE);
+    ctx.strokeStyle='#7a3b0e';
+    ctx.lineWidth=2;
+    ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+    ctx.beginPath();
+    ctx.moveTo(x+TILE/2,y+2); ctx.lineTo(x+TILE/2,y+TILE-2);
+    ctx.moveTo(x+2,y+TILE/2); ctx.lineTo(x+TILE-2,y+TILE/2);
+    ctx.stroke();
+  } else {
+    const used = b.type==='U';
+    ctx.fillStyle = used ? '#9c7a4c' : '#f7c530';
+    ctx.fillRect(x,y,TILE,TILE);
+    ctx.strokeStyle = used ? '#6b4f2c' : '#a5780a';
+    ctx.lineWidth=2;
+    ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+    if(!used){
+      ctx.fillStyle='#a5780a';
+      ctx.font='bold 18px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('?', x+TILE/2, y+TILE/2+1);
+    }
+  }
+}
+
+function drawFlagpole(){
+  const x = FLAG_COL*TILE - camX + TILE/2;
+  const topY = 2*TILE;
+  const botY = GROUND_ROW*TILE;
+  ctx.strokeStyle='#cfcfcf';
+  ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(x,topY); ctx.lineTo(x,botY); ctx.stroke();
+  ctx.fillStyle='#e0e0e0';
+  ctx.beginPath(); ctx.arc(x,topY,6,0,7); ctx.fill();
+  // flag
+  const flagY = topY + 10 + flagSlide;
+  ctx.fillStyle='#3bd13b';
+  ctx.beginPath();
+  ctx.moveTo(x,flagY);
+  ctx.lineTo(x+26,flagY+8);
+  ctx.lineTo(x,flagY+16);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawCastle(){
+  const baseCol = LEVEL_END_COL;
+  const x = baseCol*TILE - camX;
+  const y = (GROUND_ROW-4)*TILE;
+  ctx.fillStyle='#8a8a8a';
+  ctx.fillRect(x,y,4*TILE,4*TILE);
+  ctx.fillStyle='#6f6f6f';
+  for(let i=0;i<5;i++){
+    ctx.fillRect(x+i*TILE-TILE/2, y-TILE/2, TILE*0.6, TILE/2);
+  }
+  ctx.fillStyle='#2a2a2a';
+  ctx.fillRect(x+TILE*1.4, y+TILE*2, TILE*1.2, TILE*2);
+}
+
+function drawGoomba(g){
+  if(!g.alive) return;
+  const x = g.x - camX;
+  const y = (GROUND_ROW*TILE) - g.h;
+  ctx.save();
+  ctx.translate(x, y);
+  if(g.squish>0){
+    ctx.fillStyle='#8a5a3c';
+    ctx.fillRect(0,g.h-8,g.w,8);
+  } else {
+    ctx.fillStyle='#8a5a3c';
+    ctx.beginPath();
+    ctx.moveTo(0,g.h);
+    ctx.quadraticCurveTo(0,2,g.w/2,2);
+    ctx.quadraticCurveTo(g.w,2,g.w,g.h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.fillRect(5,10,7,7);
+    ctx.fillRect(g.w-12,10,7,7);
+    ctx.fillStyle='#000';
+    ctx.fillRect(7,12,3,3);
+    ctx.fillRect(g.w-10,12,3,3);
+    ctx.fillStyle='#5c3a24';
+    ctx.fillRect(2,g.h-6,7,6);
+    ctx.fillRect(g.w-9,g.h-6,7,6);
+  }
+  ctx.restore();
+}
+
+function drawMushroomPlayer(){
+  const x = player.x - camX;
+  const y = player.y;
+  const w = player.w, h = player.h;
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  ctx.scale(player.facing,1);
+  ctx.translate(-w/2,-h/2);
+
+  const squash = player.dead ? 0 : (Math.abs(player.vy)>2 && !player.onGround ? 0.06 : 0);
+
+  // stem/body
+  ctx.fillStyle='#f4e2c0';
+  ctx.fillRect(w*0.22, h*0.45, w*0.56, h*0.4);
+  // shoes
+  ctx.fillStyle='#7a3b0e';
+  ctx.fillRect(w*0.05, h*0.85, w*0.4, h*0.15);
+  ctx.fillRect(w*0.55, h*0.85, w*0.4, h*0.15);
+  // eyes on stem
+  ctx.fillStyle='#000';
+  ctx.fillRect(w*0.36, h*0.55, w*0.08, h*0.08);
+  ctx.fillRect(w*0.56, h*0.55, w*0.08, h*0.08);
+  // cap
+  ctx.fillStyle='#e33b2e';
+  ctx.beginPath();
+  ctx.moveTo(0, h*0.5*(1+squash));
+  ctx.quadraticCurveTo(0, -h*0.05, w/2, -h*0.05);
+  ctx.quadraticCurveTo(w, -h*0.05, w, h*0.5*(1+squash));
+  ctx.closePath();
+  ctx.fill();
+  // cap spots
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.ellipse(w*0.28,h*0.18,4.5,4,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.62,h*0.1,4,3.5,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.85,h*0.28,3.5,3,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.5,h*0.32,3,3,0,0,7); ctx.fill();
+  // cap rim shadow
+  ctx.fillStyle='#b32a20';
+  ctx.fillRect(0,h*0.48,w,h*0.08);
+
+  ctx.restore();
+}
+
+function drawBackground(){
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#5c94fc');
+  grad.addColorStop(1,'#bfe4ff');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // sun (Oximiron photo)
+  const sunX = 640 - camX*0.4;
+  const sunY = 90;
+  const r = 46;
+  if(sunImg.complete && sunImg.naturalWidth){
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(sunX,sunY,r,0,Math.PI*2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle='#ffdd55';
+    ctx.fillRect(sunX-r,sunY-r,r*2,r*2);
+    const iw = sunImg.naturalWidth, ih=sunImg.naturalHeight;
+    const scale = Math.max((r*2)/iw,(r*2)/ih);
+    const dw=iw*scale, dh=ih*scale;
+    ctx.drawImage(sunImg, sunX-dw/2, sunY-dh/2, dw, dh);
+    ctx.restore();
+    ctx.strokeStyle='#ffcc00';
+    ctx.lineWidth=5;
+    ctx.beginPath(); ctx.arc(sunX,sunY,r+3,0,Math.PI*2); ctx.stroke();
+    for(let i=0;i<8;i++){
+      const a = i*(Math.PI/4);
+      ctx.beginPath();
+      ctx.moveTo(sunX+Math.cos(a)*(r+6), sunY+Math.sin(a)*(r+6));
+      ctx.lineTo(sunX+Math.cos(a)*(r+16), sunY+Math.sin(a)*(r+16));
+      ctx.strokeStyle='#ffcc00'; ctx.lineWidth=4;
+      ctx.stroke();
+    }
+  }
+
+  // clouds (parallax)
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  const cloudPositions = [120, 520, 980, 1400, 1850, 2300, 2750];
+  cloudPositions.forEach((cx,i)=>{
+    const x = cx - camX*0.5;
+    if(x<-100||x>W+100) return;
+    const y = 60 + (i%3)*20;
+    drawCloud(x,y);
+  });
+
+  // bushes
+  ctx.fillStyle='#2fa93a';
+  const bushPositions = [300, 900, 1600, 2200, 2900];
+  bushPositions.forEach(bx=>{
+    const x = bx - camX*0.7;
+    if(x<-80||x>W+80) return;
+    drawBush(x, GROUND_ROW*TILE-14);
+  });
+}
+
+function drawCloud(x,y){
+  ctx.beginPath();
+  ctx.arc(x,y,14,0,7);
+  ctx.arc(x+16,y-8,16,0,7);
+  ctx.arc(x+34,y,14,0,7);
+  ctx.fill();
+  ctx.fillRect(x-2,y,50,14);
+}
+function drawBush(x,y){
+  ctx.beginPath();
+  ctx.arc(x,y,12,0,7);
+  ctx.arc(x+16,y-6,15,0,7);
+  ctx.arc(x+34,y,12,0,7);
+  ctx.fill();
+}
+
+function draw(){
+  drawBackground();
+
+  drawGround();
+  pipes.forEach(drawPipe);
+  stairs.forEach(s=>{
+    for(let r=GROUND_ROW-1; r>=GROUND_ROW-s.h; r--){
+      drawStairBlock(s.col,r);
+    }
+  });
+  blocks.forEach(drawBlock);
+  drawFlagpole();
+  drawCastle();
+  goombas.forEach(drawGoomba);
+  if(!player.dead || Math.floor(Date.now()/100)%2===0){
+    drawMushroomPlayer();
+  }
+
+  popups.forEach(p=>{
+    ctx.globalAlpha = Math.max(0,p.life/40);
+    ctx.fillStyle=p.color;
+    ctx.font='bold 14px monospace';
+    ctx.textAlign='center';
+    ctx.fillText(p.text, p.x-camX+16, p.y);
+    ctx.globalAlpha=1;
+  });
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
