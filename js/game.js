@@ -22,7 +22,11 @@ const EMPTY = 0, DIRT = 1, ROCK = 2, WATER = 3, PURPLE = 4;
 const BLUE_GAP = [18, 26];      // spout opening columns [x0, x1)
 const PURPLE_GAP = [148, 155];
 const DIRT_TOP = 1, DIRT_BOTTOM = 123;
-const FUNNEL_DEPTH = 3; // rows of pre-cleared shaft directly beneath each spout
+// A tall narrow shaft (not the full width, so it never pools sideways)
+// pre-cleared beneath each spout, deep enough to give the rotated faucet
+// graphic room to sit above the actual spawn point.
+const FUNNEL_DEPTH = 13;
+const SPAWN_ROW = FUNNEL_DEPTH - 1; // grid row liquid actually spawns on, right at the nozzle
 
 // Both goals are enclosed rock basins dug into the ground (like Swampy's tub
 // in the original game) so water collects right there instead of spreading
@@ -63,6 +67,11 @@ let particles = [];
 let celebrated50 = false;   // one-shot "Cartman is happy" trigger at 50% blue collected
 let celebrateFrame = -1;    // frame the celebration burst started, -1 = inactive
 let currentBluePct = 0;
+
+// Both taps start shut — like the original game, you tap the valve to
+// open it instead of water just appearing at level start.
+let blueOn = false, purpleOn = false;
+let blueTapFrame = -1, purpleTapFrame = -1; // frame each valve was opened, for the bounce fx
 
 const bgCanvas = document.getElementById('bgCanvas');
 const sandCanvas = document.getElementById('sandCanvas');
@@ -119,8 +128,10 @@ waterTexImg.onload = () => {
   purpleTexCanvas.width = waterTexImg.naturalWidth;
   purpleTexCanvas.height = waterTexImg.naturalHeight;
   const pctx = purpleTexCanvas.getContext('2d');
-  // shift the same caustics photo from blue toward purple/magenta
-  pctx.filter = 'hue-rotate(95deg) saturate(1.4) brightness(1.02)';
+  // shift the same caustics photo from blue toward purple/magenta — the
+  // source photo is fairly pale, so saturation is pushed hard to read as
+  // unmistakably purple even as a thin, sparse trickle right at the spout
+  pctx.filter = 'hue-rotate(95deg) saturate(3.6) contrast(1.15) brightness(0.92)';
   pctx.drawImage(waterTexImg, 0, 0);
   pctx.filter = 'none';
 
@@ -141,7 +152,7 @@ faucetImg.onload = () => {
   purpleFaucetCanvas.width = faucetImg.naturalWidth;
   purpleFaucetCanvas.height = faucetImg.naturalHeight;
   const pctx = purpleFaucetCanvas.getContext('2d');
-  pctx.filter = 'hue-rotate(95deg) saturate(1.4) brightness(1.02)';
+  pctx.filter = 'hue-rotate(95deg) saturate(3.6) contrast(1.15) brightness(0.92)';
   pctx.drawImage(faucetImg, 0, 0);
   pctx.filter = 'none';
 
@@ -239,6 +250,10 @@ function buildLevel() {
   stopDigSound();
   celebrated50 = false;
   celebrateFrame = -1;
+  blueOn = false;
+  purpleOn = false;
+  blueTapFrame = -1;
+  purpleTapFrame = -1;
   updateHud();
 }
 
@@ -260,6 +275,43 @@ function stageToGrid(clientX, clientY) {
   const gx = Math.floor((clientX - rect.left) / rect.width * GRID_W);
   const gy = Math.floor((clientY - rect.top) / rect.height * GRID_H);
   return [gx, gy];
+}
+
+function stageToBgPx(clientX, clientY) {
+  const rect = stage.getBoundingClientRect();
+  const x = (clientX - rect.left) / rect.width * BG_W;
+  const y = (clientY - rect.top) / rect.height * BG_H;
+  return [x, y];
+}
+
+// Circle covering each faucet's on-screen footprint, for tap detection.
+function getFaucetHit(key) {
+  const cfg = FAUCETS[key];
+  const nozzle = faucetNozzle(cfg.gap);
+  const angle = cfg.angleDeg * Math.PI / 180;
+  const cx = nozzle.x + (cfg.len / 2) * Math.cos(angle);
+  const cy = nozzle.y + (cfg.len / 2) * Math.sin(angle);
+  const radius = cfg.len / 2 + cfg.thickness / 2 + 8;
+  return { cx, cy, radius };
+}
+
+// Returns 'blue' / 'purple' and turns the water on if (bx,by) (background-
+// canvas px) lands on that faucet while it's still shut, else null. Once a
+// valve is open its area digs normally like the rest of the ground — only
+// the first tap ever consumes the gesture.
+function tryTapFaucet(bx, by) {
+  for (const key of ['blue', 'purple']) {
+    const isOn = key === 'blue' ? blueOn : purpleOn;
+    if (isOn) continue;
+    const hit = getFaucetHit(key);
+    const dx = bx - hit.cx, dy = by - hit.cy;
+    if (dx * dx + dy * dy <= hit.radius * hit.radius) {
+      if (key === 'blue') { blueOn = true; blueTapFrame = frameCount; }
+      if (key === 'purple') { purpleOn = true; purpleTapFrame = frameCount; }
+      return key;
+    }
+  }
+  return null;
 }
 
 function digAt(gx, gy) {
@@ -297,8 +349,10 @@ function pointerPos(e) {
 
 function onPointerDown(e) {
   if (ended) return;
-  dragging = true;
   const [cx, cy] = pointerPos(e);
+  const [bx, by] = stageToBgPx(cx, cy);
+  if (tryTapFaucet(bx, by)) { e.preventDefault(); return; }
+  dragging = true;
   const [gx, gy] = stageToGrid(cx, cy);
   const dug = digAt(gx, gy);
   if (dug) startDigSound(); else stopDigSound();
@@ -386,16 +440,16 @@ function stepCell(x, y) {
 }
 
 function spawnSources() {
-  if (blueRemaining > 0) {
+  if (blueOn && blueRemaining > 0) {
     for (let n = 0; n < 2 && blueRemaining > 0; n++) {
       const x = BLUE_GAP[0] + Math.floor(Math.random() * (BLUE_GAP[1] - BLUE_GAP[0]));
-      const i = idx(x, 1);
+      const i = idx(x, SPAWN_ROW);
       if (grid[i] === EMPTY) { grid[i] = WATER; blueRemaining--; }
     }
   }
-  if (purpleRemaining > 0) {
+  if (purpleOn && purpleRemaining > 0) {
     const x = PURPLE_GAP[0] + Math.floor(Math.random() * (PURPLE_GAP[1] - PURPLE_GAP[0]));
-    const i = idx(x, 1);
+    const i = idx(x, SPAWN_ROW);
     if (grid[i] === EMPTY) { grid[i] = PURPLE; purpleRemaining--; }
   }
 }
@@ -585,15 +639,37 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Draws the faucet photo sitting just above the spout gap, its nozzle
-// (the image's left end) lined up over the opening. Drawn on the topmost
-// layer (with the particles) so the dirt underneath never covers it.
-function drawFaucet(ctx, gap, texCanvas) {
-  const cx = (gap[0] + gap[1]) / 2 * CELL;
-  const w = 84;
-  const h = w * (texCanvas.height / texCanvas.width);
-  const nozzleInset = w * 0.1; // the nozzle sits slightly inside the image's left edge
-  ctx.drawImage(texCanvas, cx - nozzleInset, 1, w, h);
+// Draws the faucet photo rotated so its nozzle (the image's left tip)
+// sits exactly at (nozzleX, nozzleY) and points the given direction —
+// this is also where water/purple actually spawns, so the stream reads
+// as coming straight out of the spout. Drawn on the topmost layer (with
+// the particles) so the sand underneath never covers it.
+function drawFaucet(ctx, texCanvas, angleDeg, nozzleX, nozzleY, len, thickness) {
+  const angle = angleDeg * Math.PI / 180;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const nozzleLocalX = -len / 2; // the nozzle is the image's left-center point
+  const offX = nozzleLocalX * cos;
+  const offY = nozzleLocalX * sin;
+  const originX = nozzleX - offX;
+  const originY = nozzleY - offY;
+
+  ctx.save();
+  ctx.translate(originX, originY);
+  ctx.rotate(angle);
+  ctx.drawImage(texCanvas, -len / 2, -thickness / 2, len, thickness);
+  ctx.restore();
+
+  return { originX, originY, angle, len, thickness };
+}
+
+// Faucet placement: nozzle sits right where the liquid spawns, angled
+// in from each side like a spigot planted into the sand.
+const FAUCETS = {
+  blue: { gap: BLUE_GAP, angleDeg: -100, len: 70, thickness: 24 },
+  purple: { gap: PURPLE_GAP, angleDeg: -80, len: 70, thickness: 24 },
+};
+function faucetNozzle(gap) {
+  return { x: (gap[0] + gap[1]) / 2 * CELL, y: SPAWN_ROW * CELL + 2 };
 }
 
 let simImageData = simCtx.createImageData(GRID_W, GRID_H);
@@ -701,12 +777,47 @@ function paintMaskedTexture(targetCtx, maskCanvas, texCanvas, tileW, driftX, dri
   targetCtx.drawImage(maskedTempCanvas, 0, 0);
 }
 
+function renderFaucet(key) {
+  if (!faucetReady) return;
+  const cfg = FAUCETS[key];
+  const on = key === 'blue' ? blueOn : purpleOn;
+  const tapFrame = key === 'blue' ? blueTapFrame : purpleTapFrame;
+  const tex = key === 'blue' ? blueFaucetCanvas : purpleFaucetCanvas;
+  const nozzle = faucetNozzle(cfg.gap);
+
+  if (!on) {
+    // pulsing ring inviting the player to tap the valve open
+    const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.08);
+    fxCtx.save();
+    fxCtx.globalAlpha = 0.35 + 0.25 * pulse;
+    fxCtx.strokeStyle = '#fff6c9';
+    fxCtx.lineWidth = 2.5;
+    fxCtx.beginPath();
+    fxCtx.arc(nozzle.x, nozzle.y, 14 + 5 * pulse, 0, Math.PI * 2);
+    fxCtx.stroke();
+    fxCtx.restore();
+  }
+
+  let scale = 1;
+  if (tapFrame >= 0) {
+    const t = frameCount - tapFrame;
+    const decay = Math.exp(-t * 0.15);
+    if (decay > 0.02) scale = 1 + 0.3 * Math.sin(t * 0.6) * decay;
+  }
+
+  fxCtx.save();
+  if (!on) fxCtx.globalAlpha = 0.55; // dim until the valve is opened
+  fxCtx.translate(nozzle.x, nozzle.y);
+  fxCtx.scale(scale, scale);
+  fxCtx.translate(-nozzle.x, -nozzle.y);
+  drawFaucet(fxCtx, tex, cfg.angleDeg, nozzle.x, nozzle.y, cfg.len, cfg.thickness);
+  fxCtx.restore();
+}
+
 function renderFx() {
   fxCtx.clearRect(0, 0, BG_W, BG_H);
-  if (faucetReady) {
-    drawFaucet(fxCtx, BLUE_GAP, blueFaucetCanvas);
-    drawFaucet(fxCtx, PURPLE_GAP, purpleFaucetCanvas);
-  }
+  renderFaucet('blue');
+  renderFaucet('purple');
   for (const p of particles) {
     fxCtx.globalAlpha = Math.max(0, p.life / p.maxLife);
     fxCtx.fillStyle = p.color;
