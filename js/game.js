@@ -315,14 +315,22 @@ function buildLevel() {
   blueTapFrame = -1;
   purpleTapFrame = -1;
   duckCollected = 0;
-  duckState = DUCKS.map(() => ({ collected: false, popFrame: -1 }));
+  duckState = DUCKS.map(() => ({ collected: false, popFrame: -1, filling: false, fillStart: -1, fillColor: 0 }));
   updateDuckTracker();
   updateHud();
 }
 
 function updateDuckTracker() {
   const icons = document.querySelectorAll('.duck-icon');
-  icons.forEach((el, i) => el.classList.toggle('collected', !!(duckState[i] && duckState[i].collected)));
+  icons.forEach((el, i) => {
+    const isCollected = !!(duckState[i] && duckState[i].collected);
+    const wasCollected = el.classList.contains('collected');
+    el.classList.toggle('collected', isCollected);
+    if (isCollected && !wasCollected) {
+      el.classList.add('just-collected');
+      setTimeout(() => el.classList.remove('just-collected'), 600);
+    }
+  });
 }
 
 function clearBoxAboveWall(box, wall) {
@@ -543,28 +551,45 @@ function collectZones() {
   }
 }
 
+const DUCK_FILL_FRAMES = 50; // ~0.8s at 60fps — the niche visibly fills before the duck pops
+
 function collectDucks() {
   for (let d = 0; d < DUCKS.length; d++) {
     const state = duckState[d];
     if (!state || state.collected) continue;
+
+    if (state.filling) {
+      // once it's caught some liquid, the niche keeps filling on its own
+      // pace — no need to keep touching it every single frame
+      if (frameCount - state.fillStart >= DUCK_FILL_FRAMES) {
+        state.collected = true;
+        state.popFrame = frameCount;
+        duckCollected++;
+        const burstColor = state.fillColor === PURPLE
+          ? ['#e9c6ff', '#c77dff', '#a24fe0', '#ffffff']
+          : ['#cdeeff', '#7fd4ff', '#35b6ff', '#ffffff'];
+        spawnCelebrationBurst(DUCKS[d].x, DUCKS[d].y, burstColor);
+        updateDuckTracker();
+      }
+      continue;
+    }
+
     const duck = DUCKS[d];
     const r = DUCK_COLLECT_RADIUS;
-    let touched = false;
-    for (let y = duck.y - r; y <= duck.y + r && !touched; y++) {
+    let touchedType = 0;
+    for (let y = duck.y - r; y <= duck.y + r && !touchedType; y++) {
       if (y < 0 || y >= GRID_H) continue;
       for (let x = duck.x - r; x <= duck.x + r; x++) {
         if (x < 0 || x >= GRID_W) continue;
         if ((x - duck.x) ** 2 + (y - duck.y) ** 2 > r * r) continue;
         const v = grid[idx(x, y)];
-        if (v === WATER || v === PURPLE) { touched = true; break; }
+        if (v === WATER || v === PURPLE) { touchedType = v; break; }
       }
     }
-    if (touched) {
-      state.collected = true;
-      state.popFrame = frameCount;
-      duckCollected++;
-      spawnCelebrationBurst(duck.x, duck.y, ['#fff6c9', '#ffd23f', '#ff9f43', '#ffffff']);
-      updateDuckTracker();
+    if (touchedType) {
+      state.filling = true;
+      state.fillStart = frameCount;
+      state.fillColor = touchedType;
     }
   }
 }
@@ -930,15 +955,24 @@ function renderDucks() {
       continue;
     }
 
-    // glowing wall niche, like the original game's duck sockets
+    const fillProgress = state.filling ? Math.min(1, (frameCount - state.fillStart) / DUCK_FILL_FRAMES) : 0;
+    const liquidColor = state.fillColor === PURPLE ? '#c25bf0' : '#3fc0ff';
+    const liquidColorLight = state.fillColor === PURPLE ? '#eccdff' : '#bdeeff';
+
+    // glowing wall niche, like the original game's duck sockets — glows
+    // brighter and in the liquid's own color once it starts filling
     const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.05 + d);
-    const glow = fxCtx.createRadialGradient(cx, cy, 1, cx, cy, 15 + 2 * pulse);
-    glow.addColorStop(0, `rgba(150, 230, 210, ${0.55 + 0.2 * pulse})`);
-    glow.addColorStop(0.55, 'rgba(60, 130, 130, 0.4)');
+    const glowRgb = state.filling ? liquidColor : 'rgba(150, 230, 210, 1)';
+    const glowR = 15 + 2 * pulse + (state.filling ? 3 * fillProgress : 0);
+    const glow = fxCtx.createRadialGradient(cx, cy, 1, cx, cy, glowR);
+    glow.addColorStop(0, state.filling
+      ? hexToRgba(liquidColor, 0.65 + 0.25 * pulse)
+      : `rgba(150, 230, 210, ${0.55 + 0.2 * pulse})`);
+    glow.addColorStop(0.55, state.filling ? hexToRgba(liquidColor, 0.45) : 'rgba(60, 130, 130, 0.4)');
     glow.addColorStop(1, 'rgba(20, 50, 60, 0)');
     fxCtx.fillStyle = glow;
     fxCtx.beginPath();
-    fxCtx.arc(cx, cy, 15 + 2 * pulse, 0, Math.PI * 2);
+    fxCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
     fxCtx.fill();
 
     fxCtx.save();
@@ -947,17 +981,34 @@ function renderDucks() {
     fxCtx.clip();
     fxCtx.fillStyle = '#0e2a2e';
     fxCtx.fill();
+
+    // liquid rises inside the niche as it fills, like a tiny water level
+    if (state.filling && fillProgress > 0) {
+      const waterTop = cy + 11 - fillProgress * 22;
+      const wobble = Math.sin(frameCount * 0.3) * 0.8;
+      const grad = fxCtx.createLinearGradient(0, waterTop, 0, cy + 11);
+      grad.addColorStop(0, liquidColorLight);
+      grad.addColorStop(1, liquidColor);
+      fxCtx.fillStyle = grad;
+      fxCtx.fillRect(cx - 11, waterTop + wobble, 22, 22);
+    }
     fxCtx.restore();
 
-    fxCtx.strokeStyle = 'rgba(190, 245, 230, 0.85)';
+    fxCtx.strokeStyle = state.filling ? hexToRgba(liquidColorLight, 0.9) : 'rgba(190, 245, 230, 0.85)';
     fxCtx.lineWidth = 1.5;
     fxCtx.beginPath();
     fxCtx.arc(cx, cy, 11, 0, Math.PI * 2);
     fxCtx.stroke();
 
-    const bob = Math.sin(frameCount * 0.06 + d * 2) * 1.2;
-    fxCtx.drawImage(duckImg, cx - 9, cy - 9 + bob, 18, 18);
+    const bob = state.filling ? 0 : Math.sin(frameCount * 0.06 + d * 2) * 1.2;
+    const jiggle = state.filling ? Math.sin(frameCount * 0.8 + d) * (0.6 + 1.4 * fillProgress) : 0;
+    fxCtx.drawImage(duckImg, cx - 9 + jiggle, cy - 9 + bob, 18, 18);
   }
+}
+
+function hexToRgba(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
 function renderFx() {
