@@ -455,6 +455,11 @@ window.addEventListener('touchcancel', onPointerUp);
 window.addEventListener('blur', stopDigSound);
 
 // ---- Fluid simulation --------------------------------------------------
+// How many cells a resting liquid cell searches sideways per step. Sand
+// only ever slides 1 cell at a time, which is exactly why the old version
+// read as sand pouring rather than water — a real liquid levels out fast.
+const DISPERSION = 7;
+
 function moveCell(x, y, val) {
   const i = idx(x, y);
   const below = idx(x, y + 1);
@@ -491,7 +496,16 @@ function moveCell(x, y, val) {
   if (dir === -1 && !canL) dir = 0;
   if (dir === 0) dir = (canL && canR) ? (Math.random() < 0.5 ? -1 : 1) : (canL ? -1 : 1);
 
-  const targetI = dir === 1 ? rightI : leftI;
+  // slide up to DISPERSION cells in one step instead of just one, so a
+  // pool visibly rushes sideways to level itself out like a real liquid
+  let targetX = x;
+  for (let step = 1; step <= DISPERSION; step++) {
+    const nx = x + dir * step;
+    if (nx <= 0 || nx >= GRID_W - 1) break;
+    if (grid[idx(nx, y)] !== EMPTY) break;
+    targetX = nx;
+  }
+  const targetI = idx(targetX, y);
   grid[targetI] = val; grid[i] = EMPTY;
   flow[targetI] = dir; flow[i] = 0;
   processed[targetI] = 1;
