@@ -551,6 +551,10 @@ function collectZones() {
       if (grid[i] === WATER) {
         grid[i] = EMPTY; blueCollected++;
         spawnParticle(x, y, '#35b6ff');
+      } else if (grid[i] === PURPLE) {
+        spawnParticle(x, y, '#a24fe0');
+        failLevel('Картман хлебнул фиолетовой воды! Она предназначалась Баттерсу.');
+        return;
       }
     }
   }
@@ -560,6 +564,10 @@ function collectZones() {
       if (grid[i] === PURPLE) {
         grid[i] = EMPTY; purpleCollected++;
         spawnParticle(x, y, '#a24fe0');
+      } else if (grid[i] === WATER) {
+        spawnParticle(x, y, '#35b6ff');
+        failLevel('Баттерсу попала обычная вода! Ему нужна была фиолетовая.');
+        return;
       }
     }
   }
@@ -679,6 +687,19 @@ function finishLevel() {
   overlayStars.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   overlayText.textContent = `Синей воды собрано: ${bluePct}% · Фиолетовой у Баттерса: ${purplePct}% · Уточек: ${duckCollected}/${DUCKS.length}`;
   overlayBtn.textContent = win ? 'Играть снова' : 'Попробовать снова';
+  overlay.classList.remove('hidden');
+}
+
+// Instant fail: the wrong liquid reached a character's mouth — Cartman
+// only drinks blue water, Butters only drinks purple.
+function failLevel(message) {
+  if (ended) return;
+  ended = true;
+  stopDigSound();
+  overlayTitle.textContent = 'Не та вода!';
+  overlayStars.textContent = '☆☆☆';
+  overlayText.textContent = message;
+  overlayBtn.textContent = 'Попробовать снова';
   overlay.classList.remove('hidden');
 }
 
