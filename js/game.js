@@ -65,19 +65,23 @@ let celebrateFrame = -1;    // frame the celebration burst started, -1 = inactiv
 let currentBluePct = 0;
 
 const bgCanvas = document.getElementById('bgCanvas');
+const sandCanvas = document.getElementById('sandCanvas');
 const waterCanvas = document.getElementById('waterCanvas');
 const simCanvas = document.getElementById('simCanvas');
 const fxCanvas = document.getElementById('fxCanvas');
 const bgCtx = bgCanvas.getContext('2d');
+const sandCtx = sandCanvas.getContext('2d', { alpha: true });
 const waterCtx = waterCanvas.getContext('2d', { alpha: true });
 const simCtx = simCanvas.getContext('2d', { alpha: true });
 const fxCtx = fxCanvas.getContext('2d');
 
 bgCanvas.width = BG_W; bgCanvas.height = BG_H;
+sandCanvas.width = BG_W; sandCanvas.height = BG_H;
 waterCanvas.width = BG_W; waterCanvas.height = BG_H;
 simCanvas.width = GRID_W; simCanvas.height = GRID_H;
 fxCanvas.width = BG_W; fxCanvas.height = BG_H;
 simCtx.imageSmoothingEnabled = false;
+sandCtx.imageSmoothingEnabled = true;
 waterCtx.imageSmoothingEnabled = true;
 
 const bluePctEl = document.getElementById('bluePct');
@@ -145,6 +149,18 @@ faucetImg.onload = () => {
   drawBackground();
 };
 faucetImg.src = 'assets/faucet.webp';
+
+// ---- Sand texture (real photo, replaces the flat pixel dirt color) ------
+let sandTexCanvas = null, sandTexReady = false;
+const sandTexImg = new Image();
+sandTexImg.onload = () => {
+  sandTexCanvas = document.createElement('canvas');
+  sandTexCanvas.width = sandTexImg.naturalWidth;
+  sandTexCanvas.height = sandTexImg.naturalHeight;
+  sandTexCanvas.getContext('2d').drawImage(sandTexImg, 0, 0);
+  sandTexReady = true;
+};
+sandTexImg.src = 'assets/sand_texture.jpg';
 
 // ---- Level construction ---------------------------------------------------
 function idx(x, y) { return y * GRID_W + x; }
@@ -582,19 +598,15 @@ function drawFaucet(ctx, gap, texCanvas) {
 
 let simImageData = simCtx.createImageData(GRID_W, GRID_H);
 function renderSim() {
-  // dirt & rock only — water/purple are rendered separately as a real
-  // photo texture (see renderWater), clipped to their grid cells
+  // rock only — dirt/water/purple are rendered separately as real photo
+  // textures (see renderSand / renderWater), clipped to their grid cells
   const data = simImageData.data;
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       const i = idx(x, y);
       const p = i * 4;
-      const v = grid[i];
       let r = 0, gC = 0, b = 0, a = 0;
-      if (v === DIRT) {
-        const shade = (x + y) % 5 === 0 ? 1 : 0;
-        r = shade ? 0x8a : 0x7a; gC = shade ? 0x5c : 0x52; b = shade ? 0x36 : 0x30; a = 255;
-      } else if (v === ROCK) {
+      if (grid[i] === ROCK) {
         const shade = (x * 3 + y) % 7 === 0;
         r = gC = b = shade ? 0x60 : 0x4a; a = 255;
         b += 6;
@@ -605,22 +617,25 @@ function renderSim() {
   simCtx.putImageData(simImageData, 0, 0);
 }
 
-// Low-res binary masks (one per liquid) rasterized from the grid, then
-// scaled up with smoothing so tunnel edges look soft instead of blocky.
-const blueMaskCanvas = document.createElement('canvas');
-const purpleMaskCanvas = document.createElement('canvas');
-blueMaskCanvas.width = purpleMaskCanvas.width = GRID_W;
-blueMaskCanvas.height = purpleMaskCanvas.height = GRID_H;
-const blueMaskCtx = blueMaskCanvas.getContext('2d');
-const purpleMaskCtx = purpleMaskCanvas.getContext('2d');
-let blueMaskData = blueMaskCtx.createImageData(GRID_W, GRID_H);
-let purpleMaskData = purpleMaskCtx.createImageData(GRID_W, GRID_H);
+// Low-res binary masks (one per liquid/material) rasterized from the grid,
+// then scaled up with smoothing so tunnel edges look soft instead of blocky.
+function createMask() {
+  const c = document.createElement('canvas');
+  c.width = GRID_W; c.height = GRID_H;
+  const ctx = c.getContext('2d');
+  return { canvas: c, ctx, data: ctx.createImageData(GRID_W, GRID_H) };
+}
+const blueMask = createMask();
+const purpleMask = createMask();
+const sandMask = createMask();
 
-const waterTempCanvas = document.createElement('canvas');
-waterTempCanvas.width = BG_W; waterTempCanvas.height = BG_H;
-const waterTempCtx = waterTempCanvas.getContext('2d');
+// scratch canvases shared by every masked-texture paint this frame (safe
+// since each paint finishes synchronously before the next one starts)
+const maskedTempCanvas = document.createElement('canvas');
+maskedTempCanvas.width = BG_W; maskedTempCanvas.height = BG_H;
+const maskedTempCtx = maskedTempCanvas.getContext('2d');
 
-// scratch canvas for the fully-tiled texture, built fresh per liquid per
+// scratch canvas for the fully-tiled texture, built fresh per material per
 // frame, then stamped onto the mask with a *single* source-in draw
 // (several source-in draws in a row would AND their coverage together
 // instead of OR-ing it, erasing everything outside the last tile)
@@ -632,27 +647,37 @@ function renderWater() {
   waterCtx.clearRect(0, 0, BG_W, BG_H);
   if (!texReady) return;
 
-  const bData = blueMaskData.data, pData = purpleMaskData.data;
+  const bData = blueMask.data.data, pData = purpleMask.data.data;
   for (let i = 0; i < grid.length; i++) {
     const p = i * 4;
-    const isBlue = grid[i] === WATER;
-    const isPurple = grid[i] === PURPLE;
-    bData[p + 3] = isBlue ? 255 : 0;
-    pData[p + 3] = isPurple ? 255 : 0;
+    bData[p + 3] = grid[i] === WATER ? 255 : 0;
+    pData[p + 3] = grid[i] === PURPLE ? 255 : 0;
   }
-  blueMaskCtx.putImageData(blueMaskData, 0, 0);
-  purpleMaskCtx.putImageData(purpleMaskData, 0, 0);
+  blueMask.ctx.putImageData(blueMask.data, 0, 0);
+  purpleMask.ctx.putImageData(purpleMask.data, 0, 0);
 
-  paintMaskedTexture(blueMaskCanvas, blueTexCanvas, frameCount * 0.15, frameCount * 0.05);
-  paintMaskedTexture(purpleMaskCanvas, purpleTexCanvas, frameCount * 0.12, -frameCount * 0.04);
+  paintMaskedTexture(waterCtx, blueMask.canvas, blueTexCanvas, 100, frameCount * 0.15, frameCount * 0.05);
+  paintMaskedTexture(waterCtx, purpleMask.canvas, purpleTexCanvas, 100, frameCount * 0.12, -frameCount * 0.04);
 }
 
-const TEX_TILE_W = 100; // on-screen tile size — small enough to show ripple variety inside a narrow dug tunnel
-function buildTiledTexture(texCanvas, driftX, driftY) {
+function renderSand() {
+  sandCtx.clearRect(0, 0, BG_W, BG_H);
+  if (!sandTexReady) return;
+
+  const sData = sandMask.data.data;
+  for (let i = 0; i < grid.length; i++) {
+    sData[i * 4 + 3] = grid[i] === DIRT ? 255 : 0;
+  }
+  sandMask.ctx.putImageData(sandMask.data, 0, 0);
+
+  paintMaskedTexture(sandCtx, sandMask.canvas, sandTexCanvas, 170, 0, 0);
+}
+
+function buildTiledTexture(texCanvas, tileW, driftX, driftY) {
   tiledTexCtx.globalCompositeOperation = 'source-over';
   tiledTexCtx.clearRect(0, 0, BG_W, BG_H);
-  const tw = TEX_TILE_W;
-  const th = TEX_TILE_W * (texCanvas.height / texCanvas.width);
+  const tw = tileW;
+  const th = tileW * (texCanvas.height / texCanvas.width);
   const startX = -(driftX % tw) - tw;
   const startY = -(driftY % th) - th;
   for (let y = startY; y < BG_H; y += th) {
@@ -662,18 +687,18 @@ function buildTiledTexture(texCanvas, driftX, driftY) {
   }
 }
 
-function paintMaskedTexture(maskCanvas, texCanvas, driftX, driftY) {
-  waterTempCtx.globalCompositeOperation = 'source-over';
-  waterTempCtx.clearRect(0, 0, BG_W, BG_H);
-  waterTempCtx.imageSmoothingEnabled = true;
-  waterTempCtx.drawImage(maskCanvas, 0, 0, BG_W, BG_H);
+function paintMaskedTexture(targetCtx, maskCanvas, texCanvas, tileW, driftX, driftY) {
+  maskedTempCtx.globalCompositeOperation = 'source-over';
+  maskedTempCtx.clearRect(0, 0, BG_W, BG_H);
+  maskedTempCtx.imageSmoothingEnabled = true;
+  maskedTempCtx.drawImage(maskCanvas, 0, 0, BG_W, BG_H);
 
-  buildTiledTexture(texCanvas, driftX, driftY);
-  waterTempCtx.globalCompositeOperation = 'source-in';
-  waterTempCtx.drawImage(tiledTexCanvas, 0, 0);
-  waterTempCtx.globalCompositeOperation = 'source-over';
+  buildTiledTexture(texCanvas, tileW, driftX, driftY);
+  maskedTempCtx.globalCompositeOperation = 'source-in';
+  maskedTempCtx.drawImage(tiledTexCanvas, 0, 0);
+  maskedTempCtx.globalCompositeOperation = 'source-over';
 
-  waterCtx.drawImage(waterTempCanvas, 0, 0);
+  targetCtx.drawImage(maskedTempCanvas, 0, 0);
 }
 
 function renderFx() {
@@ -713,6 +738,7 @@ function tick() {
     frameCount++;
   }
   renderSim();
+  renderSand();
   renderWater();
   drawBackground();
   updateParticles();

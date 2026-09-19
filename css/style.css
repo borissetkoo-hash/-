@@ -120,6 +120,7 @@ html, body {
 
 #fxCanvas { pointer-events: none; }
 #waterCanvas { image-rendering: auto; pointer-events: none; }
+#sandCanvas { image-rendering: auto; pointer-events: none; }
 
 #overlay {
   position: absolute;
