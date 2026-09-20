@@ -96,6 +96,32 @@ const SPRITES = {
       "dazed": 8
     }
   },
+  "bird_blue": {
+    "frames": [
+      "00.png",
+      "01.png",
+      "02.png",
+      "03.png",
+      "04.png",
+      "05.png",
+      "06.png",
+      "07.png",
+      "08.png",
+      "09.png",
+      "10.png",
+      "11.png"
+    ],
+    "size": 224,
+    "bodyFraction": 0.5805,
+    "dir": "assets/birds/blue/",
+    "roles": {
+      "idle": 1,
+      "aim": 0,
+      "fly": 6,
+      "impact": 4,
+      "dazed": 9
+    }
+  },
   "pig_green": {
     "frames": [
       "00.png",
@@ -129,31 +155,6 @@ const SPRITES = {
           8
         ]
       ]
-    }
-  },
-  "bird_blue": {
-    "frames": [
-      "00.png",
-      "01.png",
-      "02.png",
-      "03.png",
-      "04.png",
-      "05.png",
-      "06.png",
-      "07.png",
-      "08.png",
-      "09.png",
-      "10.png"
-    ],
-    "size": 161,
-    "bodyFraction": 0.5428,
-    "dir": "assets/birds/blue/",
-    "roles": {
-      "idle": 0,
-      "aim": 5,
-      "fly": 6,
-      "impact": 7,
-      "dazed": 8
     }
   },
   "bird_white": {
