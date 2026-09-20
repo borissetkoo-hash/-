@@ -202,6 +202,14 @@ const Game = {
     this._damageOne(bodyA, bodyB, energy);
     this._damageOne(bodyB, bodyA, energy);
 
+    /* Птица сама урона не получает, но на момент удара должна скорчить
+       соответствующую рожу. Порог по энергии нужен, чтобы лицо не дёргалось,
+       когда птица просто катится по земле и задевает мелочь. */
+    if (energy > 40) {
+      if (bodyA.gameEntity instanceof Bird) bodyA.gameEntity.registerHit();
+      if (bodyB.gameEntity instanceof Bird) bodyB.gameEntity.registerHit();
+    }
+
     // Пыль в месте сильного удара — чисто для ощущения веса
     if (energy > 60) {
       const mx = (bodyA.position.x + bodyB.position.x) / 2;
@@ -442,8 +450,9 @@ const Game = {
     // 2. Разбираем очереди разрушений и взрывов (см. пояснение выше)
     this.processPending();
 
-    // 3. Обновляем свиней (мигание после удара)
-    for (const pig of this.pigs) pig.update();
+    // 3. Обновляем персонажей: моргание свиней, выражение лица и поворот птиц
+    for (const pig of this.pigs) pig.update(dt);
+    for (const bird of this.birds) bird.update(dt);
 
     // 4. Частицы
     Effects.update();
@@ -697,16 +706,28 @@ const Game = {
     }
   },
 
-  /* Очередь птиц слева от рогатки, как в оригинале */
+  /* Очередь птиц слева от рогатки, как в оригинале.
+     В присланной записи настоящей игры видно именно это: птицы, ждущие
+     своей очереди, сидят на земле слева и подпрыгивают к рогатке по одной. */
   _drawBirdQueue(ctx) {
-    const baseX = CONFIG.slingshot.x - 130;
-    const baseY = CONFIG.ground.y - 22;
+    const baseX = CONFIG.slingshot.x - 120;
+    const baseY = CONFIG.ground.y - 20;
 
     for (let i = 0; i < this.queue.length; i++) {
       const type = this.queue[i];
       const spec = CONFIG.birds[type];
-      const x = baseX - i * 42;
+      const x = baseX - i * 46;
 
+      // Если есть настоящий спрайт этой птицы — рисуем спокойное лицо
+      const set = Assets.set('bird_' + type);
+      if (set && set.roles.idle !== undefined) {
+        if (Assets.drawFrame(ctx, 'bird_' + type, set.roles.idle,
+                             x, baseY, spec.radius * 1.7, 0)) {
+          continue;
+        }
+      }
+
+      // Иначе кружок с клювом, как раньше
       ctx.save();
       ctx.globalAlpha = 0.95;
       ctx.beginPath();

@@ -10,3 +10,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Обзорные листы кадров: их заново делает tools/slice-sprites.py
+contact-*.png

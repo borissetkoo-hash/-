@@ -58,6 +58,24 @@ function check(name, ok, extra) {
   check('птица заряжена на рогатке', init.slingLoaded === true);
   check('нет ошибок в консоли', errors.length === 0, errors.join(' | '));
 
+  console.log('\n--- 1б. СПРАЙТЫ ЗАГРУЗИЛИСЬ? ---');
+  const sprites = await page.evaluate(() => {
+    const bird = Assets.set('bird_red');
+    const pig = Assets.set('pig_green');
+    return {
+      birdFrames: bird ? bird.frames.filter(Boolean).length : 0,
+      birdRoles: bird ? Object.keys(bird.roles) : [],
+      birdFraction: bird ? bird.bodyFraction : null,
+      pigFrames: pig ? pig.frames.filter(Boolean).length : 0,
+      pigStages: pig && pig.roles.stages ? pig.roles.stages.length : 0
+    };
+  });
+  console.log('  ' + JSON.stringify(sprites));
+  check('кадры птицы загружены', sprites.birdFrames === 11, sprites.birdFrames + ' из 11');
+  check('кадры свиньи загружены', sprites.pigFrames === 9, sprites.pigFrames + ' из 9');
+  check('у свиньи три стадии повреждений', sprites.pigStages === 3, sprites.pigStages);
+  check('у птицы описаны все роли', sprites.birdRoles.length === 5, sprites.birdRoles.join(','));
+
   console.log('\n--- 2. УСТОЙЧИВОСТЬ КОНСТРУКЦИИ (не разваливается сама) ---');
   const before = await page.evaluate(() => ({ p: Game.pigs.length, b: Game.blocks.length }));
   await page.waitForTimeout(3000);
@@ -117,6 +135,14 @@ function check(name, ok, extra) {
     lastPoint: Slingshot.trajectory[Slingshot.trajectory.length - 1]
   }));
   console.log('  ' + JSON.stringify(aim));
+  const faceAim = await page.evaluate(() => ({
+    state: Slingshot.bird ? Slingshot.bird.animState() : null,
+    angle: Slingshot.bird ? Math.round(Slingshot.bird.visualAngle * 180 / Math.PI) : null
+  }));
+  console.log('  лицо при натяжении: ' + JSON.stringify(faceAim));
+  check('при натяжении лицо злое (aim)', faceAim.state === 'aim', faceAim.state);
+  check('на рогатке птица развёрнута назад', faceAim.angle !== null && Math.abs(faceAim.angle) > 90,
+        'угол ' + faceAim.angle + ' градусов');
   check('режим прицеливания включился', aim.aiming === true);
   check('траектория посчитана', aim.traj > 10, aim.traj + ' точек');
   check('скорость направлена вправо-вверх', aim.v.x > 0 && aim.v.y < 0);
@@ -133,6 +159,14 @@ function check(name, ok, extra) {
     x: Game.activeBird ? Game.activeBird.x : null
   }));
   console.log('  ' + JSON.stringify(launched));
+  const faceFly = await page.evaluate(() => ({
+    state: Game.activeBird ? Game.activeBird.animState() : null,
+    angle: Game.activeBird ? Math.round(Game.activeBird.visualAngle * 180 / Math.PI) : null
+  }));
+  console.log('  лицо в полёте: ' + JSON.stringify(faceFly));
+  check('в полёте лицо агрессивное (fly)', faceFly.state === 'fly', faceFly.state);
+  check('в полёте птица смотрит вперёд', faceFly.angle !== null && Math.abs(faceFly.angle) < 90,
+        'угол ' + faceFly.angle + ' градусов');
   check('состояние стало flying', launched.state === 'flying');
   check('птица получила скорость', launched.v && launched.v.x > 5);
 

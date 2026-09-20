@@ -193,7 +193,13 @@ class Pig extends Entity {
 
     this.radius = radius;
     this.kind = kind;
-    this.hurtFlash = 0;    // счётчик мигания после попадания
+    this.hurtFlash = 0;    // счётчик реакции на попадание
+
+    /* Моргание. Случайная пауза, а не одинаковая для всех: если все свиньи на
+       уровне моргнут одновременно, получится жутковато и сразу видно, что это
+       машина. Разброс делает их живыми. */
+    this.blinking = false;
+    this.blinkTimer = 800 + Math.random() * 3000;
   }
 
   takeDamage(amount) {
@@ -201,16 +207,49 @@ class Pig extends Entity {
     return super.takeDamage(amount);
   }
 
-  update() {
-    // Плавно гасим вспышку. 0.92 за кадр это примерно четверть секунды.
+  /* ---------------------------------------------------------------------------
+     СТАДИЯ ПОВРЕЖДЕНИЙ
+     ---------------------------------------------------------------------------
+     На присланном листе девять кадров: три состояния по три кадра.
+     Целая, с одним синяком, с двумя синяками и высунутым языком.
+     Переводим оставшееся здоровье в номер стадии: выше двух третей — целая,
+     выше трети — побитая, ниже — еле живая. Игрок видит по лицу, сколько ещё
+     осталось, и это честная подсказка, а не украшение.
+     --------------------------------------------------------------------------- */
+  damageStage() {
+    const ratio = this.healthRatio();
+    if (ratio > 0.66) return 0;
+    if (ratio > 0.33) return 1;
+    return 2;
+  }
+
+  update(dt) {
+    // Плавно гасим реакцию на удар
     if (this.hurtFlash > 0) this.hurtFlash *= 0.92;
+
+    // Моргание: короткое закрытие глаз и длинная пауза
+    this.blinkTimer -= dt;
+    if (this.blinkTimer <= 0) {
+      this.blinking = !this.blinking;
+      this.blinkTimer = this.blinking ? 130 : 1600 + Math.random() * 3200;
+    }
   }
 
   draw(ctx) {
-    const spriteName = 'pig_' + this.kind;
-    const d = this.radius * 2;
-    if (Assets.drawSprite(ctx, spriteName, this.x, this.y, d, d, this.angle)) return;
-    if (Assets.drawSprite(ctx, 'pig_normal', this.x, this.y, d, d, this.angle)) return;
+    const set = Assets.set('pig_green');
+    if (set && set.roles.stages) {
+      const stage = set.roles.stages[this.damageStage()];
+      // В каждой стадии три кадра: обычный, моргание, реакция на удар
+      let frame = stage[0];
+      if (this.hurtFlash > 0.35) frame = stage[2];
+      else if (this.blinking) frame = stage[1];
+
+      if (Assets.drawFrame(ctx, 'pig_green', frame,
+                           this.x, this.y, this.radius * 2, this.angle)) {
+        this._drawHeadgear(ctx);
+        return;
+      }
+    }
 
     const r = this.radius;
     ctx.save();
@@ -316,6 +355,45 @@ class Pig extends Entity {
 
     ctx.restore();
   }
+
+  /* Корона короля и каска рисуются кодом поверх спрайта: на присланном листе
+     свинья только одна, без короны и каски. Когда пришлёшь их отдельными
+     картинками, этот метод можно будет убрать. */
+  _drawHeadgear(ctx) {
+    if (this.kind !== 'king' && this.kind !== 'helmet') return;
+
+    const r = this.radius;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+
+    if (this.kind === 'king') {
+      ctx.fillStyle = '#ffd33a';
+      ctx.strokeStyle = '#a8801a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.6, -r * 0.88);
+      ctx.lineTo(-r * 0.38, -r * 1.32);
+      ctx.lineTo(-r * 0.12, -r * 0.98);
+      ctx.lineTo(r * 0.12, -r * 1.38);
+      ctx.lineTo(r * 0.38, -r * 0.98);
+      ctx.lineTo(r * 0.6, -r * 1.28);
+      ctx.lineTo(r * 0.62, -r * 0.84);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#b9c2cb';
+      ctx.strokeStyle = '#6c757d';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.22, r * 1.0, Math.PI * 1.06, Math.PI * 1.94);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 /* =============================================================================
@@ -344,6 +422,68 @@ class Bird extends Entity {
     this.abilityUsed = false;  // способность одноразовая
     this.restTimer = 0;        // сколько времени птица почти не двигается
     this.lifeTimer = 0;        // сколько всего живёт после выстрела
+
+    /* УГОЛ ДЛЯ КАРТИНКИ, ОТДЕЛЬНЫЙ ОТ ФИЗИЧЕСКОГО
+       Тело птицы — круг. Кругу всё равно, как он повёрнут: на столкновения это
+       не влияет никак. Значит, поворот картинки можно считать самим, как
+       удобнее для вида.
+
+       В присланной записи настоящей игры видно: птица в полёте НЕ кувыркается,
+       а всегда смотрит туда, куда летит. А на оттянутой рогатке она развёрнута
+       назад, вдоль резинки. Ровно это здесь и воспроизводится. */
+    this.visualAngle = 0;
+    this.impactTimer = 0;      // сколько ещё показывать лицо удара, в мс
+  }
+
+  /* ---------------------------------------------------------------------------
+     СОСТОЯНИЕ ЛИЦА
+     Возвращает не номер кадра, а РОЛЬ. Номера кадров живут в js/sprites.js.
+     Благодаря этому можно перенарезать спрайт-лист, и здесь ничего не менять.
+     --------------------------------------------------------------------------- */
+  animState() {
+    if (this.impactTimer > 0) return 'impact';
+
+    if (!this.launched) {
+      // На рогатке: спокойное лицо, но при сильном натяжении птица злится
+      const dx = this.x - CONFIG.slingshot.x;
+      const dy = this.y - CONFIG.slingshot.y;
+      const pull = Math.sqrt(dx * dx + dy * dy);
+      return pull > CONFIG.slingshot.maxPull * 0.3 ? 'aim' : 'idle';
+    }
+
+    // Отлетала своё и лежит на земле — показываем помятую
+    if (this.restTimer > 450) return 'dazed';
+    return 'fly';
+  }
+
+  update(dt) {
+    if (this.impactTimer > 0) this.impactTimer -= dt;
+
+    if (this.launched) {
+      const v = this.body.velocity;
+      const speed = Math.sqrt(v.x * v.x + v.y * v.y);
+
+      if (speed > 1.2) {
+        /* atan2(y, x) даёт угол вектора скорости. Именно atan2, а не atan:
+           обычный atan не различает направления «вправо-вверх» и «влево-вниз»,
+           потому что не знает знаков по отдельности. atan2 знает и возвращает
+           правильный угол во всех четырёх четвертях. */
+        this.visualAngle = Math.atan2(v.y, v.x);
+        this.restTimer = 0;
+      } else {
+        this.restTimer += dt;
+      }
+    } else {
+      // На рогатке смотрим вдоль резинки, то есть назад от развилки
+      const dx = this.x - CONFIG.slingshot.x;
+      const dy = this.y - CONFIG.slingshot.y;
+      this.visualAngle = (dx * dx + dy * dy) > 30 ? Math.atan2(dy, dx) : 0;
+    }
+  }
+
+  // Вызывается игрой, когда птица во что-то врезалась
+  registerHit() {
+    this.impactTimer = 300;
   }
 
   /* ---------------------------------------------------------------------------
@@ -385,9 +525,18 @@ class Bird extends Entity {
   }
 
   draw(ctx) {
-    const d = this.radius * 2.2;
-    if (Assets.drawSprite(ctx, 'bird_' + this.type, this.x, this.y, d, d, this.angle)) return;
+    // Сначала пробуем нарисовать настоящий спрайт нужного выражения лица
+    const set = Assets.set('bird_' + this.type);
+    if (set) {
+      const frame = set.roles[this.animState()];
+      if (frame !== undefined &&
+          Assets.drawFrame(ctx, 'bird_' + this.type, frame,
+                           this.x, this.y, this.radius * 2, this.visualAngle)) {
+        return;
+      }
+    }
 
+    // Спрайтов нет — рисуем птицу кодом, как раньше
     const r = this.radius;
     const s = this.spec;
 
