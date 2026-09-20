@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<!-- viewport нужен, чтобы на телефоне страница не масштабировалась как
+     десктопная. user-scalable=no убирает случайный зум двумя пальцами,
+     который в игре только мешает. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Angry Birds — учебная версия</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- Холст. Вся игра рисуется здесь. Размеры задаются в JS с учётом
+       плотности пикселей экрана, поэтому в атрибутах их не пишем. -->
+  <canvas id="game"></canvas>
+
+  <!-- Верхняя панель -->
+  <div id="hud">
+    <div class="hud-left">
+      <button id="btn-restart" class="btn" title="Начать уровень заново (клавиша R)">⟲</button>
+      <button id="btn-next" class="btn" title="Следующий уровень">➜</button>
+      <span id="level-name" class="level-name"></span>
+    </div>
+
+    <div class="hud-right">
+      <div class="stat"><span class="label">Птиц</span><span id="birds-left">0</span></div>
+      <div class="stat"><span class="label">Свиней</span><span id="pigs-left">0</span></div>
+      <div class="stat"><span class="label">Рекорд</span><span id="highscore">0</span></div>
+      <div class="stat score"><span class="label">Очки</span><span id="score">0</span></div>
+    </div>
+  </div>
+
+  <div id="hint">Тяни птицу назад и отпусти. В полёте нажми на экран или пробел — сработает способность.</div>
+
+  <!-- Экран победы и поражения. Спрятан, пока нет класса visible. -->
+  <div id="overlay">
+    <div class="panel">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text"></p>
+      <div class="panel-buttons">
+        <button id="btn-overlay-restart" class="btn big">Заново</button>
+        <button id="btn-overlay-next" class="btn big primary">Дальше</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ПОРЯДОК ПОДКЛЮЧЕНИЯ ВАЖЕН.
+     Браузер выполняет файлы сверху вниз. Если physics.js подключить раньше
+     matter.min.js, то на строке с Matter он упадёт: переменной ещё нет.
+     Правило: сначала библиотеки, потом настройки, потом то, что их использует. -->
+<script src="js/vendor/matter.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/slingshot.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/game.js"></script>
+
+</body>
+</html>

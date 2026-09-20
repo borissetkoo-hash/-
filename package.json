@@ -1,0 +1,14 @@
+{
+  "name": "angry-birds-lesson",
+  "version": "1.0.0",
+  "description": "Учебная версия Angry Birds на HTML5 Canvas и Matter.js с подробными комментариями на русском",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 8123 --bind 127.0.0.1",
+    "check": "node tools/check-levels.js",
+    "test": "node tools/test-game.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
