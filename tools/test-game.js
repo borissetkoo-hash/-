@@ -235,7 +235,76 @@ function check(name, ok, extra) {
   check('оба ската крыши на месте', roof.rows.length === 2, 'найдено: ' + roof.rows.length);
   check('скаты не съехали', roof.worst < 10, 'макс. отклонение ' + roof.worst.toFixed(1) + ' градусов');
 
+  console.log('\n--- 7в. НЕТ ЛИ ТЕЛ-ПРИЗРАКОВ ПОСЛЕ СМЕНЫ УРОВНЕЙ ---');
+  // Регрессия на баг: птица на рогатке делалась статичной, а очистка уровня
+  // удаляла только подвижные тела. У рогатки копились невидимые препятствия.
+  const ghosts = await page.evaluate(() => {
+    const rows = [];
+    for (let i = 0; i < 5; i++) {
+      Game.loadLevel(i % 3);
+      const expected = Game.blocks.length + Game.pigs.length + Game.birds.length + 3;
+      rows.push({ n: i, level: Game.level.name, bodies: Physics.allBodies().length, expected });
+    }
+    return rows;
+  });
+  for (const r of ghosts) {
+    console.log('  загрузка ' + r.n + ' (' + r.level + '): тел ' + r.bodies + ', ожидалось ' + r.expected);
+  }
+  check('лишних тел в мире не остаётся',
+        ghosts.every(r => r.bodies === r.expected),
+        ghosts.map(r => r.bodies + '/' + r.expected).join(' '));
+
+  console.log('\n--- 7г. НА КАЖДОМ УРОВНЕ ПТИЦА УЛЕТАЕТ СВОБОДНО ---');
+  for (let lvl = 0; lvl < 3; lvl++) {
+    const flight = await page.evaluate(async (index) => {
+      Game.loadLevel(index);
+      const bird = Slingshot.bird;
+      Matter.Body.setStatic(bird.body, false);
+      Matter.Body.setVelocity(bird.body, { x: 22, y: -6 });
+      bird.launched = true;
+      Slingshot.bird = null;
+      Game.activeBird = bird;
+      Game.state = 'flying';
+      let maxX = bird.x;
+      for (let i = 0; i < 90; i++) {
+        Physics.step(16.7);
+        if (bird.x > maxX) maxX = bird.x;
+      }
+      return { level: Game.level.name, start: Math.round(CONFIG.slingshot.x), maxX: Math.round(maxX) };
+    }, lvl);
+    console.log('  ' + flight.level + ': с ' + flight.start + ' улетела до ' + flight.maxX);
+    check('на уровне ' + (lvl + 1) + ' рогатка не мешает выстрелу', flight.maxX > 700,
+          'долетела до x=' + flight.maxX);
+  }
+
+  console.log('\n--- 7д. СВИНЬЯ ГИБНЕТ ПОД ЗАВАЛОМ ---');
+  const crush = await page.evaluate(() => {
+    Physics.clearWorld();
+    Game.blocks = []; Game.pigs = []; Game.birds = [];
+
+    const pig = new Pig(900, CONFIG.ground.y - 20, 20);
+    Game.pigs.push(pig); Physics.add(pig.body);
+    const slab = new Block(900, CONFIG.ground.y - 120, 200, 26, 'stone');
+    Game.blocks.push(slab); Physics.add(slab.body);
+
+    const steps = [];
+    let died = null;
+    for (let i = 0; i < 240; i++) {
+      Physics.step(16.7);
+      Game.processPending();
+      Game._applyCrushDamage(16.7);
+      if (i % 40 === 0) steps.push({ ms: Math.round(i * 16.7), hp: Math.round(pig.hp), load: +Physics.loadOn(pig.body).toFixed(1) });
+      if (!pig.alive && died === null) died = Math.round(i * 16.7);
+    }
+    return { steps, died, pigsLeft: Game.pigs.length };
+  });
+  for (const st of crush.steps) console.log('  ' + st.ms + ' мс: здоровье ' + st.hp + ', давление ' + st.load);
+  check('свинья под каменной плитой погибает', crush.died !== null,
+        crush.died !== null ? 'через ' + crush.died + ' мс' : 'выжила');
+  check('погибшая свинья убрана с поля', crush.pigsLeft === 0, 'осталось ' + crush.pigsLeft);
+
   console.log('\n--- 8. СКРИНШОТЫ ---');
+  await page.evaluate(() => Game.loadLevel(0));
   await page.evaluate(() => Game.loadLevel(0));
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'shot-level1.png' });

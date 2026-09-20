@@ -124,10 +124,12 @@ const Game = {
     this.level = LEVELS[this.levelIndex];
     this.theme = THEMES[this.level.theme] || THEMES.day;
 
-    // Чистим прошлый уровень: убираем все тела, кроме земли и стен
-    for (const body of Physics.allBodies()) {
-      if (!body.isStatic) Physics.remove(body);
-    }
+    /* Чистим прошлый уровень. Важно: удалять надо ВСЁ, кроме земли и стен,
+       а не только подвижное. Подробности и история бага — в physics.js. */
+    Physics.clearWorld();
+    Slingshot.bird = null;
+    Slingshot.aiming = false;
+    Slingshot.trajectory = [];
 
     this.blocks = [];
     this.pigs = [];
@@ -231,7 +233,8 @@ const Game = {
       multiplier = CONFIG.damage.birdBonus * sourceEntity.spec.damage;
     }
 
-    const fragility = (entity instanceof Block) ? entity.mat.fragility : 1.0;
+    const fragility = (entity instanceof Block) ? entity.mat.fragility
+                    : (entity instanceof Pig) ? CONFIG.pig.fragility : 1.0;
     const damage = energy * multiplier * fragility;
 
     if (entity.takeDamage(damage)) {
@@ -306,6 +309,38 @@ const Game = {
     }
 
     Physics.remove(entity.body);
+  },
+
+  /* ---------------------------------------------------------------------------
+     УРОН ОТ ПРИДАВЛИВАНИЯ
+     ---------------------------------------------------------------------------
+     Physics считает, с какой силой на каждое тело давят соседи. Здесь эта сила
+     превращается в урон свиньям.
+
+     Ключевой момент — вычитание порога:
+
+         урон = (давление - порог) * скорость * время
+
+     Без вычитания свинья медленно умирала бы просто от того, что стоит на
+     земле: контакт с землёй тоже даёт давление. Порог отсекает нормальное
+     «стою и ничего не происходит» и оставляет только настоящий завал.
+
+     Умножение на время кадра нужно, чтобы урон не зависел от частоты кадров:
+     на экране 144 Гц свинья должна умирать за то же время, что и на 60 Гц. */
+  _applyCrushDamage(dt) {
+    const threshold = CONFIG.damage.crushThreshold;
+    const rate = CONFIG.damage.crushRate;
+
+    for (const pig of this.pigs.slice()) {
+      if (!pig.alive) continue;
+      const load = Physics.loadOn(pig.body);
+      if (load <= threshold) continue;
+
+      const damage = (load - threshold) * rate * dt;
+      if (pig.takeDamage(damage, false)) {
+        this.queueDestroy(pig);
+      }
+    }
   },
 
   addScore(points, x, y) {
@@ -450,20 +485,23 @@ const Game = {
     // 2. Разбираем очереди разрушений и взрывов (см. пояснение выше)
     this.processPending();
 
-    // 3. Обновляем персонажей: моргание свиней, выражение лица и поворот птиц
+    // 3. Урон от придавливания: свинья под завалом должна погибать
+    this._applyCrushDamage(dt);
+
+    // 4. Обновляем персонажей: моргание свиней, выражение лица и поворот птиц
     for (const pig of this.pigs) pig.update(dt);
     for (const bird of this.birds) bird.update(dt);
 
-    // 4. Частицы
+    // 5. Частицы
     Effects.update();
 
-    // 5. Логика хода
+    // 6. Логика хода
     this._updateTurn(dt);
 
-    // 6. Камера
+    // 7. Камера
     this._updateCamera();
 
-    // 7. Тряска экрана затухает
+    // 8. Тряска экрана затухает
     if (this.shake > 0) this.shake *= 0.9;
   },
 

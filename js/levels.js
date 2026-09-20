@@ -186,9 +186,9 @@ function level2() {
 
   // --- Хрупкий ледяной фундамент: вот сюда и надо целиться ---
   const s1 = putColumns(out, [1180, 1320, 1460, 1600], GY, 100, 'ice', 24);
-  putPig(out, 1250, GY, 22, 'helmet');
+  putPig(out, 1250, GY, 22);
   putPig(out, 1390, GY, 22);
-  putPig(out, 1530, GY, 22, 'helmet');
+  putPig(out, 1530, GY, 22);
 
   // --- Тяжёлые каменные плиты сверху ---
   putBeam(out, 1250, s1, 200, 'stone', 26);
@@ -256,8 +256,8 @@ function level3() {
   putBox(out, 1450, GY, 40, 'tnt');
 
   // --- Свиньи в касках на земле ---
-  putPig(out, 1260, GY, 20, 'helmet');
-  putPig(out, 1510, GY, 20, 'helmet');
+  putPig(out, 1260, GY, 20);
+  putPig(out, 1510, GY, 20);
 
   moveAll(out, FORT_OFFSET);
 

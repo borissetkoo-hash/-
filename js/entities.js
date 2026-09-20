@@ -187,9 +187,13 @@ class Pig extends Entity {
       label: 'pig'
     });
 
-    // Шлем даёт прибавку к прочности. Как в оригинале: каска держит удар.
-    const armor = kind === 'helmet' ? 2.0 : (kind === 'king' ? 1.6 : 1.0);
-    super(body, radius * CONFIG.pig.hpPerRadius * 10 * armor);
+    /* Прочность зависит ТОЛЬКО от размера. Раньше были ещё скрытые множители
+       за каску и корону, но каски и короны нет на присланном листе, а значит
+       игрок не мог бы увидеть разницу. Скрытая от игрока прочность — плохая
+       механика: свинья выглядит как соседняя, а ломается вдвое дольше, и
+       выглядит это как поломка игры, а не как замысел.
+       Теперь всё честно: крупная свинья крепче, и это видно. */
+    super(body, radius * CONFIG.pig.hpPerRadius * 10);
 
     this.radius = radius;
     this.kind = kind;
@@ -202,8 +206,12 @@ class Pig extends Entity {
     this.blinkTimer = 800 + Math.random() * 3000;
   }
 
-  takeDamage(amount) {
-    this.hurtFlash = 1;
+  /* spike отвечает за мимику. Резкий удар — свинья корчится (кадр реакции).
+     Медленное придавливание — тоже больно, но рожу корчить незачем, иначе
+     придавленная свинья застынет с одним и тем же выражением навсегда. */
+  takeDamage(amount, spike = true) {
+    if (spike) this.hurtFlash = 1;
+    else this.hurtFlash = Math.max(this.hurtFlash, 0.5);
     return super.takeDamage(amount);
   }
 
@@ -246,7 +254,6 @@ class Pig extends Entity {
 
       if (Assets.drawFrame(ctx, 'pig_green', frame,
                            this.x, this.y, this.radius * 2, this.angle)) {
-        this._drawHeadgear(ctx);
         return;
       }
     }
@@ -356,44 +363,6 @@ class Pig extends Entity {
     ctx.restore();
   }
 
-  /* Корона короля и каска рисуются кодом поверх спрайта: на присланном листе
-     свинья только одна, без короны и каски. Когда пришлёшь их отдельными
-     картинками, этот метод можно будет убрать. */
-  _drawHeadgear(ctx) {
-    if (this.kind !== 'king' && this.kind !== 'helmet') return;
-
-    const r = this.radius;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-
-    if (this.kind === 'king') {
-      ctx.fillStyle = '#ffd33a';
-      ctx.strokeStyle = '#a8801a';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.6, -r * 0.88);
-      ctx.lineTo(-r * 0.38, -r * 1.32);
-      ctx.lineTo(-r * 0.12, -r * 0.98);
-      ctx.lineTo(r * 0.12, -r * 1.38);
-      ctx.lineTo(r * 0.38, -r * 0.98);
-      ctx.lineTo(r * 0.6, -r * 1.28);
-      ctx.lineTo(r * 0.62, -r * 0.84);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = '#b9c2cb';
-      ctx.strokeStyle = '#6c757d';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, -r * 0.22, r * 1.0, Math.PI * 1.06, Math.PI * 1.94);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 }
 
 /* =============================================================================

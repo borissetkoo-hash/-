@@ -29,6 +29,7 @@
 import json
 import os
 import sys
+import colorsys
 from collections import deque, Counter
 
 from PIL import Image
@@ -66,6 +67,87 @@ ROLES = {
         ]
     },
 }
+
+
+# -----------------------------------------------------------------------------
+# ВАРИАНТЫ ОКРАСКИ ИЗ ОДНОГО ЛИСТА
+# -----------------------------------------------------------------------------
+# Прислан лист только красной птицы, а в игре их четыре. Рисовать остальных
+# от руки нельзя: получится чужеродно рядом с настоящим ассетом.
+#
+# Поэтому жёлтая, синяя и чёрная делаются ИЗ ТОГО ЖЕ ЛИСТА перекраской. Так
+# сохраняется и стиль, и все одиннадцать выражений лица.
+#
+# Перекрашиваются не все пиксели подряд, а только насыщенно-красные. Разбор по
+# цветовому кругу (модель HSV):
+#     тело        красное,  тон около 355 градусов, насыщенность высокая  -> красим
+#     клюв        оранжевый, тон около 38 градусов                        -> не трогаем
+#     брюшко      бежевое,  тон 38, но насыщенность низкая                -> не трогаем
+#     глаза       белые,    насыщенность почти ноль                       -> не трогаем
+#     обводка     чёрная,   яркость почти ноль                            -> не трогаем
+# Без такого отбора у синей птицы позеленел бы клюв.
+VARIANTS = {
+    'yellow': {'hue': 0.13, 'sat': 1.00, 'val': 1.06},   # тон 47 градусов
+    'blue':   {'hue': 0.55, 'sat': 0.92, 'val': 1.00},   # тон 198 градусов
+    'black':  {'hue': 0.62, 'sat': 0.10, 'val': 0.30},   # почти чёрный
+}
+
+
+def recolor_frame(img, spec):
+    """Перекрасить красные пиксели кадра, сохранив тени и блики.
+
+    Важная деталь: новый тон задаётся жёстко, а ЯРКОСТЬ берётся исходная и лишь
+    домножается. Благодаря этому светлые и тёмные места тела остаются светлыми и
+    тёмными, то есть объём и тени никуда не деваются. Если бы мы просто залили
+    тело одним цветом, птица превратилась бы в плоский кружок.
+    """
+    img = img.convert('RGBA')
+    px = img.load()
+    w, h = img.size
+
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 8:
+                continue
+
+            hh, ss, vv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            degrees = hh * 360
+
+            # Только насыщенный красный: тон у краёв круга, насыщенность высокая
+            if ss < 0.5 or vv < 0.12:
+                continue
+            if not (degrees >= 330 or degrees <= 18):
+                continue
+
+            nr, ng, nb = colorsys.hsv_to_rgb(
+                spec['hue'],
+                min(1.0, ss * spec['sat']),
+                min(1.0, vv * spec['val'])
+            )
+            px[x, y] = (int(nr * 255), int(ng * 255), int(nb * 255), a)
+
+    return img
+
+
+def make_variants(src_dir, info, out_root):
+    """Создать цветные варианты птицы и вернуть описания наборов."""
+    made = {}
+    for name, spec in VARIANTS.items():
+        out_dir = os.path.join(out_root, 'birds', name)
+        os.makedirs(out_dir, exist_ok=True)
+        for fname in info['frames']:
+            src = Image.open(os.path.join(src_dir, fname))
+            recolor_frame(src, spec).save(os.path.join(out_dir, fname))
+        made['bird_' + name] = {
+            'frames': list(info['frames']),
+            'size': info['size'],
+            'bodyFraction': info['bodyFraction'],
+            'dir': 'assets/birds/' + name + '/',
+            'roles': dict(info['roles']),
+        }
+        print('  вариант %-7s -> %s (%d кадров)' % (name, out_dir, len(info['frames'])))
+    return made
 
 
 def strip_white_background(img):
@@ -384,6 +466,9 @@ if __name__ == '__main__':
     result['bird_red']['dir'] = 'assets/birds/red/'
     result['bird_red']['roles'] = ROLES['bird_red']
     contact_sheet(bird_dir, result['bird_red'], os.path.join(OUT_ROOT, '..', 'contact-birds.png'))
+
+    print('\n=== Цветные варианты птицы из того же листа ===')
+    result.update(make_variants(bird_dir, result['bird_red'], OUT_ROOT))
 
     result['pig_green'] = slice_sheet(pig_sheet, pig_dir, 'Свинья')
     result['pig_green']['dir'] = 'assets/pigs/green/'
