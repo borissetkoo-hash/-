@@ -13,3 +13,7 @@ Thumbs.db
 
 # Обзорные листы кадров: их заново делает tools/slice-sprites.py
 contact-*.png
+
+# Служебный кэш Python
+__pycache__/
+*.pyc
