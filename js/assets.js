@@ -27,8 +27,12 @@ const Assets = {
     block_ice:   'assets/blocks/ice.png',
     block_tnt:   'assets/blocks/tnt.png',
 
-    slingshot:   'assets/slingshot.png',
-    background:  'assets/background.png'
+    /* Рогатка состоит из двух картинок. Между ними в игре оказывается птица:
+       ствол с дальней веткой рисуется ПЕРЕД птицей, ближняя ветка ПОСЛЕ неё.
+       Именно поэтому художник и отдал её двумя кусками, а не одним. */
+    slingshot_back:  'assets/props/slingshot_back.png',
+    slingshot_front: 'assets/props/slingshot_front.png',
+    background:      'assets/background.png'
   },
 
   images: {},      // одиночные картинки

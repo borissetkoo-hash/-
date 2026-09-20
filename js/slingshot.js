@@ -175,12 +175,143 @@ const Slingshot = {
      рогатке. Это называется послойной отрисовкой, painter's algorithm:
      рисуем как художник, от дальнего к ближнему.
      --------------------------------------------------------------------------- */
-  drawBack(ctx) {
-    const a = this.anchor;
-    const fork = this.forkPoints();
-    const tip = this.bird ? { x: this.bird.x, y: this.bird.y } : { x: a.x, y: a.y - 6 };
+  /* ---------------------------------------------------------------------------
+     РАСКЛАДКА СПРАЙТА РОГАТКИ
+     ---------------------------------------------------------------------------
+     Картинка не подгоняется под игру, а игра подстраивается под картинку.
 
-    // Ствол рогатки: от земли до развилки
+     Известно две вещи: в мире рогатка стоит на земле, а птица лежит в развилке
+     на высоте anchor. Значит, расстояние от развилки до земли задано игрой.
+     В картинке это же расстояние известно в её собственных пикселях. Отношение
+     одного к другому и есть масштаб:
+
+         масштаб = (земля - развилка_в_мире) / (низ_картинки - развилка_в_картинке)
+
+     Дальше по масштабу считается, куда положить левый верхний угол картинки,
+     и где окажутся точки крепления резинок. Ни одного подобранного на глаз
+     числа: замени картинку, перемерь пять координат в config.js, и всё сойдётся
+     снова. */
+  layout() {
+    const sp = CONFIG.slingshot.sprite;
+
+    // Базовый масштаб: от развилки до земли. Затем увеличение сверх него.
+    const base = (CONFIG.ground.y - this.anchor.y) / (sp.bottomY - sp.anchorY);
+    const scale = base * (sp.boost || 1);
+
+    // Origin считается ОТ РАЗВИЛКИ, поэтому она не сдвигается при увеличении
+    const originX = this.anchor.x - sp.anchorX * scale;
+    const originY = this.anchor.y - sp.anchorY * scale;
+
+    return {
+      scale, originX, originY,
+      w: sp.width * scale,
+      h: sp.height * scale,
+      left:  { x: originX + sp.leftBand.x * scale,  y: originY + sp.leftBand.y * scale },
+      right: { x: originX + sp.rightBand.x * scale, y: originY + sp.rightBand.y * scale }
+    };
+  },
+
+  // Есть ли присланные картинки. Если нет, рисуем рогатку кодом, как раньше.
+  hasSprite() {
+    return Assets.has('slingshot_back') && Assets.has('slingshot_front');
+  },
+
+  /* Куда цепляются резинки. Со спрайтом — по измеренным точкам, без него —
+     по старым прикидкам. Вынесено в одно место, чтобы резинки и картинка
+     не разъезжались. */
+  forkPoints() {
+    if (this.hasSprite()) {
+      const L = this.layout();
+      return { left: L.left, right: L.right };
+    }
+    const a = this.anchor;
+    return {
+      left:  { x: a.x - 40, y: a.y - 20 },
+      right: { x: a.x + 34, y: a.y - 34 }
+    };
+  },
+
+  bandTip() {
+    return this.bird ? { x: this.bird.x, y: this.bird.y }
+                     : { x: this.anchor.x, y: this.anchor.y - 6 };
+  },
+
+  /* ---------------------------------------------------------------------------
+     ЗАДНИЙ СЛОЙ: ствол с дальней веткой и дальняя резинка.
+     Рисуется ДО птицы.
+     --------------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------------
+     ОБРЕЗКА ПО ЛИНИИ ЗЕМЛИ
+     ---------------------------------------------------------------------------
+     Рогатка нарочно увеличена, и её ствол уходит ниже земли. Но грунт рисуется
+     РАНЬШЕ рогатки, поэтому торчащий низ ствола оказывался поверх грунта и
+     выглядел как палка, воткнутая в стену.
+
+     Перерисовывать грунт после рогатки нельзя: он закроет всё остальное.
+     Поэтому ставится clip — прямоугольник, за пределами которого холст просто
+     не принимает рисование. Всё, что ниже линии земли, обрезается.
+
+     Правило то же, что и с save/restore: поставил clip — обязательно сними,
+     иначе обрезаться начнёт и всё, что рисуется после. */
+  _clipToGround(ctx) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-20000, -20000, 40000, 20000 + CONFIG.ground.y + 6);
+    ctx.clip();
+  },
+
+  drawBack(ctx) {
+    const fork = this.forkPoints();
+    const tip = this.bandTip();
+
+    this._clipToGround(ctx);
+    if (this.hasSprite()) {
+      const L = this.layout();
+      ctx.drawImage(Assets.get('slingshot_back'), L.originX, L.originY, L.w, L.h);
+    } else {
+      this._drawWoodenFallback(ctx, fork);
+    }
+    ctx.restore();
+
+    // Дальняя резинка идёт от правой ветки к птице, позади неё
+    this._drawBand(ctx, fork.right, tip, '#3b2314');
+  },
+
+  /* ---------------------------------------------------------------------------
+     ПЕРЕДНИЙ СЛОЙ: ближняя ветка и ближняя резинка.
+     Рисуется ПОСЛЕ птицы, поэтому птица оказывается зажата между слоями,
+     как в настоящей рогатке. Ради этого художник и разделил картинку надвое.
+     --------------------------------------------------------------------------- */
+  drawFront(ctx) {
+    const fork = this.forkPoints();
+    const tip = this.bandTip();
+
+    this._drawBand(ctx, fork.left, tip, '#4a2c19');
+
+    if (this.hasSprite()) {
+      const L = this.layout();
+      this._clipToGround(ctx);
+      ctx.drawImage(Assets.get('slingshot_front'), L.originX, L.originY, L.w, L.h);
+      ctx.restore();
+    }
+  },
+
+  /* Резинка. Чем сильнее натянута, тем тоньше: настоящая резина при растяжении
+     утончается, и глаз это считывает как напряжение. */
+  _drawBand(ctx, from, to, color) {
+    const stretch = this.pullRatio();
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = CONFIG.slingshot.bandWidth * (1 - stretch * 0.35);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  },
+
+  // Запасная отрисовка кодом, если картинок нет
+  _drawWoodenFallback(ctx, fork) {
+    const a = this.anchor;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#6b4423';
     ctx.lineWidth = 22;
@@ -189,54 +320,12 @@ const Slingshot = {
     ctx.lineTo(a.x, a.y + 26);
     ctx.stroke();
 
-    // Две ветки развилки
     ctx.lineWidth = 17;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y + 30);
     ctx.lineTo(fork.left.x, fork.left.y);
     ctx.moveTo(a.x, a.y + 30);
     ctx.lineTo(fork.right.x, fork.right.y);
-    ctx.stroke();
-
-    // Светлый блик, чтобы дерево не выглядело плоским
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(a.x - 5, CONFIG.ground.y);
-    ctx.lineTo(a.x - 5, a.y + 28);
-    ctx.stroke();
-
-    // Задняя резинка
-    ctx.strokeStyle = '#3b2314';
-    ctx.lineWidth = CONFIG.slingshot.bandWidth;
-    ctx.beginPath();
-    ctx.moveTo(fork.left.x, fork.left.y);
-    ctx.lineTo(tip.x, tip.y);
-    ctx.stroke();
-  },
-
-  /* Координаты концов развилки вынесены в отдельную функцию, потому что нужны
-     и при рисовании задней резинки, и при рисовании передней. Одно определение
-     вместо двух копий — правишь в одном месте. */
-  forkPoints() {
-    const a = this.anchor;
-    return {
-      left:  { x: a.x - 40, y: a.y - 20 },
-      right: { x: a.x + 34, y: a.y - 34 }
-    };
-  },
-
-  drawFront(ctx) {
-    const a = this.anchor;
-    const forkRight = this.forkPoints().right;
-    const tip = this.bird ? { x: this.bird.x, y: this.bird.y } : { x: a.x, y: a.y - 6 };
-
-    ctx.strokeStyle = '#563220';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = CONFIG.slingshot.bandWidth;
-    ctx.beginPath();
-    ctx.moveTo(forkRight.x, forkRight.y);
-    ctx.lineTo(tip.x, tip.y);
     ctx.stroke();
   },
 

@@ -99,6 +99,41 @@ function check(name, ok, extra) {
         Array.isArray(sprites.ignite) && sprites.ignite.length === 3,
         JSON.stringify(sprites.ignite));
 
+  console.log('\n--- 1в. РОГАТКА СОБРАНА ИЗ ПРИСЛАННЫХ КАРТИНОК ---');
+  /* Рогатка пришла двумя кусками и собирается расчётом, а не подгонкой на
+     глаз. Значит, сборку можно и нужно проверять числами: стоит ли она на
+     земле, выше ли ветки точки вылета, помещается ли птица в просвет. */
+  const sling = await page.evaluate(() => {
+    const L = Slingshot.layout();
+    const f = Slingshot.forkPoints();
+    const birdR = CONFIG.birds.red.radius;
+    return {
+      hasSprite: Slingshot.hasSprite(),
+      scale: +L.scale.toFixed(3),
+      w: Math.round(L.w), h: Math.round(L.h),
+      left: { x: Math.round(f.left.x), y: Math.round(f.left.y) },
+      right: { x: Math.round(f.right.x), y: Math.round(f.right.y) },
+      anchor: { x: Slingshot.anchor.x, y: Slingshot.anchor.y },
+      gap: Math.round(f.right.x - f.left.x),
+      birdWidth: birdR * 2,
+      trunkBottom: Math.round(L.originY + L.h),
+      ground: CONFIG.ground.y
+    };
+  });
+  console.log('  ' + JSON.stringify(sling));
+  check('картинки рогатки загрузились', sling.hasSprite === true);
+  check('точка вылета между ветками',
+        sling.anchor.x > sling.left.x && sling.anchor.x < sling.right.x,
+        sling.left.x + ' < ' + sling.anchor.x + ' < ' + sling.right.x);
+  check('ветки выше точки вылета',
+        sling.left.y < sling.anchor.y && sling.right.y < sling.anchor.y,
+        'ветки на ' + sling.left.y + ' и ' + sling.right.y + ', птица на ' + sling.anchor.y);
+  check('птица помещается в просвет вилки', sling.gap > sling.birdWidth,
+        'просвет ' + sling.gap + ', птица ' + sling.birdWidth);
+  check('ствол уходит в землю, а не висит',
+        sling.trunkBottom >= sling.ground,
+        'низ ствола ' + sling.trunkBottom + ', земля ' + sling.ground);
+
   console.log('\n--- 2. УСТОЙЧИВОСТЬ КОНСТРУКЦИИ (не разваливается сама) ---');
   const before = await page.evaluate(() => ({ p: Game.pigs.length, b: Game.blocks.length }));
   await page.waitForTimeout(3000);
