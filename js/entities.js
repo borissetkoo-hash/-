@@ -376,7 +376,7 @@ class Bird extends Entity {
       density: spec.density,
       friction: spec.friction,
       restitution: spec.restitution,
-      frictionAir: 0.006,      // лёгкое сопротивление воздуха
+      frictionAir: CONFIG.world.airFriction,   // см. пояснение в config.js
       label: 'bird'
     });
 
@@ -486,6 +486,14 @@ class Bird extends Entity {
 
       case 'bomb': {
         return { kind: 'bomb', x: this.x, y: this.y };
+      }
+
+      case 'egg': {
+        /* Белая птица роняет яйцо ВНИЗ, а сама отскакивает вперёд-вверх.
+           Это прямое следствие закона сохранения импульса: оттолкнув что-то
+           вниз, сама получаешь толчок вверх. В игре это ещё и удобно —
+           птица уходит из зоны собственного взрыва. */
+        return { kind: 'egg', x: this.x, y: this.y, velocity: { x: v.x, y: v.y } };
       }
 
       default:

@@ -44,6 +44,7 @@ html, body {
 }
 
 .hud-left, .hud-right { display: flex; align-items: center; gap: 10px; }
+.hud-right { gap: 16px; }
 .hud-left { pointer-events: auto; }
 
 .level-name { font-size: 17px; font-weight: bold; opacity: 0.95; }
@@ -55,7 +56,11 @@ html, body {
   line-height: 1.1;
   font-size: 20px;
   font-weight: bold;
-  min-width: 56px;
+  /* Запас ширины под пятизначный рекорд. При 56px надпись РЕКОРД налезала
+     на соседний счётчик. tabular-nums делает все цифры одинаковой ширины,
+     поэтому число не дёргается при каждом изменении счёта. */
+  min-width: 68px;
+  font-variant-numeric: tabular-nums;
 }
 .stat .label {
   font-size: 11px;
@@ -139,7 +144,7 @@ html, body {
 /* На узком экране телефона подсказка и панель ужимаются */
 @media (max-width: 640px) {
   #hint { font-size: 11px; white-space: normal; text-align: center; max-width: 92vw; }
-  .stat { font-size: 16px; min-width: 44px; }
+  .stat { font-size: 16px; min-width: 52px; }
   .stat.score { font-size: 21px; }
   .level-name { display: none; }
 }

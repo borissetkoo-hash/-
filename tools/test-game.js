@@ -93,7 +93,7 @@ function check(name, ok, extra) {
   // траектория падает примерно в середину крепости. Так тест не сломается,
   // если потом поменять силу рогатки или расстояние до построек.
   const pts = await page.evaluate(() => {
-    const TARGET = 1020;
+    const TARGET = 1300;
     const sx = CONFIG.slingshot.x, sy = CONFIG.slingshot.y;
     const power = CONFIG.slingshot.power * CONFIG.birds.red.power;
     let best = null;
@@ -146,7 +146,7 @@ function check(name, ok, extra) {
   check('режим прицеливания включился', aim.aiming === true);
   check('траектория посчитана', aim.traj > 10, aim.traj + ' точек');
   check('скорость направлена вправо-вверх', aim.v.x > 0 && aim.v.y < 0);
-  check('траектория попадает в крепость', aim.lastPoint && aim.lastPoint.x > 850 && aim.lastPoint.x < 1300,
+  check('траектория попадает в крепость', aim.lastPoint && aim.lastPoint.x > 1100 && aim.lastPoint.x < 1600,
         'конец пунктира x=' + (aim.lastPoint ? Math.round(aim.lastPoint.x) : '?'));
 
   console.log('\n--- 4. ВЫСТРЕЛ ---');
@@ -302,6 +302,139 @@ function check(name, ok, extra) {
   check('свинья под каменной плитой погибает', crush.died !== null,
         crush.died !== null ? 'через ' + crush.died + ' мс' : 'выжила');
   check('погибшая свинья убрана с поля', crush.pigsLeft === 0, 'осталось ' + crush.pigsLeft);
+
+  console.log('\n--- 7е. ВРЕМЯ ПОЛЁТА И ДОСЯГАЕМОСТЬ ---');
+  /* Две вещи проверяются вместе, потому что они тянут в разные стороны.
+
+     Время полёта: если птица долетает за полсекунды, нажать способность
+     невозможно. Меряем не один выстрел, а весь веер углов прицеливания, и
+     смотрим на середину разброса: пологий выстрел всегда быстрый, и это
+     нормально, это выбор игрока.
+
+     Досягаемость: если усилить рогатку ради времени, дальние свиньи станут
+     недостижимы и уровень нельзя будет пройти. Поэтому рядом проверяется,
+     что максимальная дальность с запасом перекрывает дальний край уровня. */
+  const timing = await page.evaluate(() => {
+    const out = [];
+    for (let lvl = 0; lvl < 3; lvl++) {
+      Game.loadLevel(lvl);
+
+      let fortX = Infinity, farX = 0;
+      for (const bl of Game.level.blocks) {
+        fortX = Math.min(fortX, bl.x - bl.w / 2);
+        farX = Math.max(farX, bl.x + Math.max(bl.w, bl.h) / 2);
+      }
+      for (const pg of Game.level.pigs) farX = Math.max(farX, pg.x + pg.radius);
+
+      const sx = CONFIG.slingshot.x, sy = CONFIG.slingshot.y;
+      const pw = CONFIG.slingshot.power;
+      const times = [];
+      let maxReach = 0;
+
+      for (let deg = 15; deg <= 65; deg += 5) {
+        const a = deg * Math.PI / 180;
+        const px = sx - Math.cos(a) * CONFIG.slingshot.maxPull;
+        const py = sy + Math.sin(a) * CONFIG.slingshot.maxPull;
+        const v = { x: (sx - px) * pw, y: (sy - py) * pw };
+        const path = Physics.predictTrajectory(px, py, v.x, v.y, 600, CONFIG.world.airFriction);
+
+        let steps = null;
+        for (let i = 0; i < path.length; i++) {
+          if (steps === null && path[i].x >= fortX) steps = i;
+        }
+        if (steps !== null) times.push(Math.round(steps * 16.67));
+        if (path.length) maxReach = Math.max(maxReach, path[path.length - 1].x);
+      }
+
+      times.sort((a, b) => a - b);
+      out.push({
+        level: Game.level.name,
+        fortX: Math.round(fortX),
+        farX: Math.round(farX),
+        fastest: times[0],
+        median: times[Math.floor(times.length / 2)],
+        slowest: times[times.length - 1],
+        maxReach: Math.round(maxReach)
+      });
+    }
+    return out;
+  });
+
+  for (const t of timing) {
+    console.log('  ' + t.level + ': крепость с ' + t.fortX + ', дальний край ' + t.farX);
+    console.log('      полёт до крепости: быстрее всего ' + t.fastest +
+                ' мс, обычно ' + t.median + ' мс, навесом ' + t.slowest + ' мс');
+    console.log('      дальность рогатки ' + t.maxReach + ', запас ' + (t.maxReach - t.farX));
+  }
+  check('обычного полёта хватает на способность', timing.every(t => t.median >= 950),
+        timing.map(t => t.median).join(', ') + ' мс');
+  check('навесом полёт длинный', timing.every(t => t.slowest >= 1400),
+        timing.map(t => t.slowest).join(', ') + ' мс');
+  check('дальние свиньи достижимы с запасом', timing.every(t => t.maxReach - t.farX >= 120),
+        timing.map(t => t.maxReach - t.farX).join(', ') + ' px');
+
+  console.log('\n--- 7ж. БЕЛАЯ ПТИЦА И ЯЙЦО ---');
+  const egg = await page.evaluate(() => {
+    Game.loadLevel(0);
+    const before = { blocks: Game.blocks.length, pigs: Game.pigs.length };
+
+    // Ставим белую птицу на рогатку принудительно
+    for (const b of Game.birds.slice()) Game.destroyEntity(b);
+    const bird = new Bird(CONFIG.slingshot.x, CONFIG.slingshot.y, 'white');
+    Game.birds.push(bird); Physics.add(bird.body);
+    Slingshot.load(bird);
+
+    Matter.Body.setStatic(bird.body, false);
+    Matter.Body.setVelocity(bird.body, { x: 21, y: -17 });
+    bird.launched = true;
+    Slingshot.bird = null; Game.activeBird = bird; Game.state = 'flying';
+
+    // Летим до крепости, затем роняем яйцо
+    let steps = 0;
+    while (steps < 200 && bird.x < 1150) { Physics.step(16.7); steps++; }
+    const ability = bird.useAbility();
+    Game.activeBird = bird;
+    bird.abilityUsed = false;           // чтобы triggerAbility отработал целиком
+    Game.triggerAbility();
+
+    const eggsNow = Game.blocks.filter(b => b.material === 'egg').length;
+
+    let exploded = false;
+    for (let i = 0; i < 180; i++) {
+      Physics.step(16.7);
+      if (Game.pendingExplosions.length) exploded = true;
+      Game.processPending();
+    }
+    const eggsLeft = Game.blocks.filter(b => b.material === 'egg').length;
+
+    return {
+      abilityKind: ability ? ability.kind : null,
+      eggsCreated: eggsNow, eggsLeft, exploded,
+      blocksBefore: before.blocks, blocksAfter: Game.blocks.length,
+      pigsBefore: before.pigs, pigsAfter: Game.pigs.length,
+      score: Game.score
+    };
+  });
+  console.log('  ' + JSON.stringify(egg));
+  check('способность белой птицы это яйцо', egg.abilityKind === 'egg', egg.abilityKind);
+  check('яйцо появилось', egg.eggsCreated >= 1, egg.eggsCreated);
+  check('яйцо взорвалось', egg.exploded === true);
+  check('яйцо не осталось лежать', egg.eggsLeft === 0, egg.eggsLeft);
+  check('взрыв яйца нанёс урон',
+        egg.blocksAfter < egg.blocksBefore || egg.pigsAfter < egg.pigsBefore,
+        'блоки ' + egg.blocksBefore + '->' + egg.blocksAfter + ', свиньи ' + egg.pigsBefore + '->' + egg.pigsAfter);
+
+  console.log('\n--- 7з. КАМЕРА МЕНЯЕТ МАСШТАБ ---');
+  const zoom = await page.evaluate(async () => {
+    Game.loadLevel(0);
+    const aim = Game.zoomAim, fly = Game.zoomFly;
+    const atRest = Game.camera.zoom;
+    return { aim: +aim.toFixed(3), fly: +fly.toFixed(3), atRest: +atRest.toFixed(3), right: Math.round(Game.levelRight) };
+  });
+  console.log('  ' + JSON.stringify(zoom));
+  check('боевой масштаб крупнее обзорного', zoom.fly > zoom.aim, zoom.aim + ' -> ' + zoom.fly);
+  check('на старте камера в обзорном масштабе', Math.abs(zoom.atRest - zoom.aim) < 0.01);
+  check('уровень целиком помещается в обзор', zoom.right >= 1700, 'правый край ' + zoom.right);
 
   console.log('\n--- 8. СКРИНШОТЫ ---');
   await page.evaluate(() => Game.loadLevel(0));

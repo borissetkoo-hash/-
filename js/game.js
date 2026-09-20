@@ -95,21 +95,58 @@ const Game = {
     this.cssWidth = rect.width;
     this.cssHeight = rect.height;
 
-    /* ПОДБОР ЗУМА
-       Задача: чтобы в кадр помещались и рогатка слева, и крепость справа.
-       Между ними примерно 1900 пикселей мира по горизонтали и 780 по вертикали.
+    this._computeZooms();
+    if (!this.camera.zoom) this.camera.zoom = this.zoomAim;
+  },
 
-       Берём МЕНЬШИЙ из двух масштабов. Почему меньший: если взять больший,
-       то по одной из осей картинка не влезет и часть уровня окажется за краем
-       экрана. Этот приём называется "вписать с сохранением пропорций" (contain).
+  /* ---------------------------------------------------------------------------
+     ДВА МАСШТАБА: ОБЗОРНЫЙ И БОЕВОЙ
+     ---------------------------------------------------------------------------
+     Раньше зум был один и подбирался под фиксированную ширину 1520 пикселей.
+     Как только крепости отъехали дальше, такой кадр перестал их вмещать.
 
-       Math.max(0.3, ...) страхует от совсем крошечного масштаба на узком
-       телефоне: там лучше показать часть уровня, чем всё, но нечитаемо мелко. */
-    const FIT_W = 1520;
+     Простое решение «отдалить сильнее» плохое: птицы и свиньи станут мелкими, и
+     на телефоне в них будет не попасть.
+
+     Поэтому масштабов теперь два, как в настоящей игре:
+       zoomAim — пока целишься. Вмещает весь уровень от рогатки до дальнего края,
+                 чтобы было видно, куда стрелять.
+       zoomFly — пока птица летит. Ближе примерно в полтора раза, камера едет
+                 за птицей, и попадание видно во всех подробностях.
+     Переключение плавное, тем же приёмом линейной интерполяции, что и движение
+     камеры.
+
+     Обрати внимание: ширина считается по САМОМУ уровню, а не задана числом.
+     Поэтому новый уровень с постройками подальше сам себя правильно покажет. */
+  _computeZooms() {
+    if (!this.cssWidth || !this.cssHeight) return;
+
     const FIT_H = 760;
-    this.camera.zoom = Math.max(0.3, Math.min(1.25,
-      Math.min(rect.width / FIT_W, rect.height / FIT_H)
+
+    /* Ширину обзора ограничиваем сверху. Если вписывать уровень целиком любой
+       ценой, на длинном уровне всё становится мелким и на телефоне в птицу уже
+       не попасть пальцем. Поэтому дальний край уровня может оставаться за
+       кадром: камера догонит его вместе с птицей. */
+    const MAX_SPAN = 1750;
+    const span = Math.min(this.levelRight || 1600, MAX_SPAN);
+
+    this.zoomAim = Math.max(0.26, Math.min(1.25,
+      Math.min(this.cssWidth / span, this.cssHeight / FIT_H)
     ));
+    this.zoomFly = Math.min(1.35, this.zoomAim * 1.45);
+  },
+
+  /* Где заканчивается уровень по горизонтали: правый край самой дальней
+     постройки плюс запас. Считается один раз при загрузке уровня. */
+  _measureLevel() {
+    let right = CONFIG.slingshot.x + 300;
+    for (const b of this.level.blocks) {
+      right = Math.max(right, b.x + Math.max(b.w, b.h) / 2);
+    }
+    for (const p of this.level.pigs) {
+      right = Math.max(right, p.x + p.radius);
+    }
+    this.levelRight = right + 140;
   },
 
   viewWidth()  { return this.cssWidth  / this.camera.zoom; },
@@ -162,6 +199,11 @@ const Game = {
 
     this.camera.x = 0;
     this.camera.targetX = 0;
+
+    // Уровень поменялся — пересчитываем, насколько далеко он тянется
+    this._measureLevel();
+    this._computeZooms();
+    this.camera.zoom = this.zoomAim;
 
     this._hideOverlay();
     this.nextBird();
@@ -289,16 +331,26 @@ const Game = {
       this.pigs = this.pigs.filter(p => p !== entity);
 
     } else if (entity instanceof Block) {
-      this.addScore(CONFIG.score.perBlock, entity.x, entity.y);
+      // За яйцо очки не начисляются: это свой снаряд, а не постройка врага
+      if (entity.material !== 'egg') {
+        this.addScore(CONFIG.score.perBlock, entity.x, entity.y);
+      }
       Effects.debris(entity.x, entity.y, entity.mat.color, 9, 5);
 
-      // Динамит не просто ломается, он взрывается
+      // Динамит и яйцо не просто ломаются, а взрываются
       if (entity.material === 'tnt') {
         this.pendingExplosions.push({
           x: entity.x, y: entity.y,
           radius: CONFIG.abilities.bombRadius,
           force: CONFIG.abilities.bombForce,
           damage: CONFIG.abilities.bombDamage
+        });
+      } else if (entity.material === 'egg') {
+        this.pendingExplosions.push({
+          x: entity.x, y: entity.y,
+          radius: CONFIG.abilities.eggRadius,
+          force: CONFIG.abilities.eggForce,
+          damage: CONFIG.abilities.eggDamage
         });
       }
       this.blocks = this.blocks.filter(b => b !== entity);
@@ -455,6 +507,28 @@ const Game = {
       });
       this.queueDestroy(this.activeBird);
 
+    } else if (result.kind === 'egg') {
+      const bird = this.activeBird;
+      const v = result.velocity;
+
+      // Яйцо появляется ПОД птицей, с запасом, чтобы не задеть её саму
+      const egg = new Block(bird.x, bird.y + bird.radius + 16, 15, 19, 'egg');
+      this.blocks.push(egg);
+      Physics.add(egg.body);
+      Matter.Body.setVelocity(egg.body, {
+        x: v.x * 0.35,
+        y: Math.abs(v.y) * 0.25 + 5
+      });
+
+      // Отдача: птица уходит вперёд и вверх, прочь от собственного взрыва
+      const recoil = CONFIG.abilities.eggRecoil;
+      Matter.Body.setVelocity(bird.body, {
+        x: v.x * 0.75,
+        y: -Math.abs(v.y) * recoil - 5
+      });
+
+      Effects.dust(bird.x, bird.y + bird.radius, 4);
+
     } else if (result.kind === 'dash') {
       Effects.dust(this.activeBird.x, this.activeBird.y, 3);
     }
@@ -601,13 +675,19 @@ const Game = {
      ощущение от игры меняется полностью.
      --------------------------------------------------------------------------- */
   _updateCamera() {
+    const flying = this.activeBird && this.state === 'flying';
+
+    // Плавно переезжаем между обзорным и боевым масштабом
+    const targetZoom = flying ? this.zoomFly : this.zoomAim;
+    this.camera.zoom += (targetZoom - this.camera.zoom) * CONFIG.camera.zoomSpeed;
+
     const viewW = this.viewWidth();
     const viewH = this.viewHeight();
 
     let target;
     let k;
 
-    if (this.activeBird && this.state === 'flying') {
+    if (flying) {
       target = this.activeBird.x - viewW * 0.4;
       k = CONFIG.camera.follow;
     } else {
@@ -621,11 +701,13 @@ const Game = {
 
     this.camera.x += (target - this.camera.x) * k;
 
-    /* По вертикали держим линию земли на одной и той же высоте экрана:
-       ровно 90 пикселей мира ниже неё остаётся видно (полоса грунта), а всё
-       остальное место уходит под небо и постройки. Так кадр не «съезжает»
-       при смене размера окна. */
-    this.camera.y = (CONFIG.ground.y + 90) - viewH;
+    /* По вертикали земля держится на 82% высоты экрана.
+
+       Раньше было «90 пикселей мира ниже земли», и на широком экране это
+       означало почти 92% высоты: небо занимало три четверти кадра впустую.
+       Доля вместо фиксированного числа даёт одинаковую композицию на любом
+       экране: сверху воздух для навесных выстрелов, снизу полоса грунта. */
+    this.camera.y = CONFIG.ground.y - viewH * 0.82;
   },
 
   /* ===========================================================================
@@ -748,19 +830,22 @@ const Game = {
      В присланной записи настоящей игры видно именно это: птицы, ждущие
      своей очереди, сидят на земле слева и подпрыгивают к рогатке по одной. */
   _drawBirdQueue(ctx) {
-    const baseX = CONFIG.slingshot.x - 120;
-    const baseY = CONFIG.ground.y - 20;
+    /* Очередь идёт влево от рогатки. Шаг и отступ подобраны так, чтобы даже
+       шесть птиц целиком помещались в кадр: при отступе 120 и шаге 46 пятая
+       птица уезжала за левый край экрана. */
+    const baseX = CONFIG.slingshot.x - 92;
+    const baseY = CONFIG.ground.y - 18;
 
     for (let i = 0; i < this.queue.length; i++) {
       const type = this.queue[i];
       const spec = CONFIG.birds[type];
-      const x = baseX - i * 46;
+      const x = baseX - i * 36;
 
       // Если есть настоящий спрайт этой птицы — рисуем спокойное лицо
       const set = Assets.set('bird_' + type);
       if (set && set.roles.idle !== undefined) {
         if (Assets.drawFrame(ctx, 'bird_' + type, set.roles.idle,
-                             x, baseY, spec.radius * 1.7, 0)) {
+                             x, baseY, spec.radius * 1.5, 0)) {
           continue;
         }
       }
