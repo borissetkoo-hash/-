@@ -29,8 +29,8 @@ const SPRITES = {
       "09.png",
       "10.png"
     ],
-    "size": 161,
-    "bodyFraction": 0.5428,
+    "size": 168,
+    "bodyFraction": 0.6229,
     "dir": "assets/birds/red/",
     "roles": {
       "idle": 0,
@@ -55,8 +55,8 @@ const SPRITES = {
       "10.png",
       "11.png"
     ],
-    "size": 195,
-    "bodyFraction": 0.5161,
+    "size": 192,
+    "bodyFraction": 0.5531,
     "dir": "assets/birds/black/",
     "roles": {
       "idle": 0,
@@ -85,8 +85,8 @@ const SPRITES = {
       "09.png",
       "10.png"
     ],
-    "size": 170,
-    "bodyFraction": 0.4664,
+    "size": 186,
+    "bodyFraction": 0.4866,
     "dir": "assets/birds/yellow/",
     "roles": {
       "idle": 0,
@@ -112,7 +112,7 @@ const SPRITES = {
       "11.png"
     ],
     "size": 224,
-    "bodyFraction": 0.5805,
+    "bodyFraction": 0.6873,
     "dir": "assets/birds/blue/",
     "roles": {
       "idle": 1,
@@ -120,6 +120,31 @@ const SPRITES = {
       "fly": 6,
       "impact": 4,
       "dazed": 9
+    }
+  },
+  "bird_white": {
+    "frames": [
+      "00.png",
+      "01.png",
+      "02.png",
+      "03.png",
+      "04.png",
+      "05.png",
+      "06.png",
+      "07.png",
+      "08.png",
+      "09.png",
+      "10.png"
+    ],
+    "size": 187,
+    "bodyFraction": 0.5294,
+    "dir": "assets/birds/white/",
+    "roles": {
+      "idle": 1,
+      "aim": 0,
+      "fly": 6,
+      "impact": 4,
+      "dazed": 8
     }
   },
   "pig_green": {
@@ -134,8 +159,8 @@ const SPRITES = {
       "07.png",
       "08.png"
     ],
-    "size": 114,
-    "bodyFraction": 0.7061,
+    "size": 121,
+    "bodyFraction": 0.748,
     "dir": "assets/pigs/green/",
     "roles": {
       "stages": [
@@ -155,31 +180,6 @@ const SPRITES = {
           8
         ]
       ]
-    }
-  },
-  "bird_white": {
-    "frames": [
-      "00.png",
-      "01.png",
-      "02.png",
-      "03.png",
-      "04.png",
-      "05.png",
-      "06.png",
-      "07.png",
-      "08.png",
-      "09.png",
-      "10.png"
-    ],
-    "size": 161,
-    "bodyFraction": 0.5428,
-    "dir": "assets/birds/white/",
-    "roles": {
-      "idle": 0,
-      "aim": 5,
-      "fly": 6,
-      "impact": 7,
-      "dazed": 8
     }
   }
 };
