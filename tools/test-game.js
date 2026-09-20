@@ -60,21 +60,44 @@ function check(name, ok, extra) {
 
   console.log('\n--- 1б. СПРАЙТЫ ЗАГРУЗИЛИСЬ? ---');
   const sprites = await page.evaluate(() => {
-    const bird = Assets.set('bird_red');
+    const out = { sets: {}, missing: [] };
+    for (const type of Object.keys(CONFIG.birds)) {
+      const set = Assets.set('bird_' + type);
+      if (!set) { out.missing.push(type); continue; }
+      out.sets['bird_' + type] = {
+        frames: set.frames.filter(Boolean).length,
+        total: set.frames.length,
+        fraction: set.bodyFraction,
+        roles: Object.keys(set.roles).join(',')
+      };
+    }
     const pig = Assets.set('pig_green');
-    return {
-      birdFrames: bird ? bird.frames.filter(Boolean).length : 0,
-      birdRoles: bird ? Object.keys(bird.roles) : [],
-      birdFraction: bird ? bird.bodyFraction : null,
-      pigFrames: pig ? pig.frames.filter(Boolean).length : 0,
-      pigStages: pig && pig.roles.stages ? pig.roles.stages.length : 0
-    };
+    out.pig = pig ? { frames: pig.frames.filter(Boolean).length, stages: pig.roles.stages.length } : null;
+    out.ignite = (Assets.set('bird_black') || {}).roles ? Assets.set('bird_black').roles.ignite : null;
+    return out;
   });
-  console.log('  ' + JSON.stringify(sprites));
-  check('кадры птицы загружены', sprites.birdFrames === 11, sprites.birdFrames + ' из 11');
-  check('кадры свиньи загружены', sprites.pigFrames === 9, sprites.pigFrames + ' из 9');
-  check('у свиньи три стадии повреждений', sprites.pigStages === 3, sprites.pigStages);
-  check('у птицы описаны все роли', sprites.birdRoles.length === 5, sprites.birdRoles.join(','));
+  for (const name of Object.keys(sprites.sets)) {
+    const v = sprites.sets[name];
+    console.log('  ' + name + ': ' + v.frames + '/' + v.total + ' кадров, доля тела ' +
+                v.fraction + ', роли ' + v.roles);
+  }
+  console.log('  pig_green: ' + JSON.stringify(sprites.pig));
+  console.log('  кадры накала чёрной: ' + JSON.stringify(sprites.ignite));
+
+  check('наборы всех пяти птиц загрузились', sprites.missing.length === 0,
+        'нет: ' + sprites.missing.join(','));
+  check('все кадры каждого набора на месте',
+        Object.values(sprites.sets).every(v => v.frames === v.total),
+        Object.values(sprites.sets).map(v => v.frames + '/' + v.total).join(' '));
+  check('доля тела в разумных пределах',
+        Object.values(sprites.sets).every(v => v.fraction > 0.35 && v.fraction < 0.8),
+        Object.values(sprites.sets).map(v => v.fraction).join(' '));
+  check('кадры свиньи загружены', sprites.pig && sprites.pig.frames === 9,
+        sprites.pig ? sprites.pig.frames + ' из 9' : 'нет набора');
+  check('у свиньи три стадии повреждений', sprites.pig && sprites.pig.stages === 3);
+  check('у чёрной птицы есть кадры накала',
+        Array.isArray(sprites.ignite) && sprites.ignite.length === 3,
+        JSON.stringify(sprites.ignite));
 
   console.log('\n--- 2. УСТОЙЧИВОСТЬ КОНСТРУКЦИИ (не разваливается сама) ---');
   const before = await page.evaluate(() => ({ p: Game.pigs.length, b: Game.blocks.length }));
@@ -423,6 +446,50 @@ function check(name, ok, extra) {
   check('взрыв яйца нанёс урон',
         egg.blocksAfter < egg.blocksBefore || egg.pigsAfter < egg.pigsBefore,
         'блоки ' + egg.blocksBefore + '->' + egg.blocksAfter + ', свиньи ' + egg.pigsBefore + '->' + egg.pigsAfter);
+
+  console.log('\n--- 7и. ФИТИЛЬ ЧЁРНОЙ ПТИЦЫ ---');
+  const fuse = await page.evaluate(() => {
+    Game.loadLevel(0);
+    for (const b of Game.birds.slice()) Game.destroyEntity(b);
+
+    const bird = new Bird(CONFIG.slingshot.x, CONFIG.slingshot.y, 'black');
+    Game.birds.push(bird); Physics.add(bird.body);
+    Slingshot.load(bird);
+    Matter.Body.setStatic(bird.body, false);
+    Matter.Body.setVelocity(bird.body, { x: 18, y: -14 });
+    bird.launched = true;
+    Slingshot.bird = null; Game.activeBird = bird; Game.state = 'flying';
+
+    const trace = [];
+    Game.triggerAbility();
+    const rightAfter = { state: bird.animState(), burning: bird.isFuseBurning(), exploded: bird.exploded };
+
+    /* Крутим НАСТОЯЩИЙ игровой цикл, а не отдельные его куски.
+       Первая версия этой проверки звала только Physics.step и _updateFuses,
+       и фитиль не горел вовсе: отсчёт уменьшается в Bird.update, которого в
+       той цепочке не было. Тест показывал «взрыва нет» там, где в игре всё
+       работало бы. Проверять надо то, что реально выполняется. */
+    let boomAt = null;
+    for (let i = 0; i < 90; i++) {
+      Game.update(16.7);
+      if (i % 8 === 0 && Game.birds.indexOf(bird) !== -1) {
+        trace.push({ ms: Math.round(i * 16.7), state: bird.animState(),
+                     прогресс: +bird.fuseProgress().toFixed(2) });
+      }
+      if (bird.exploded && boomAt === null) boomAt = Math.round(i * 16.7);
+    }
+    return { rightAfter, trace, boomAt, birdsLeft: Game.birds.length,
+             fuseTime: CONFIG.abilities.fuseTime };
+  });
+  console.log('  сразу после нажатия: ' + JSON.stringify(fuse.rightAfter));
+  for (const t of fuse.trace) console.log('  ' + t.ms + ' мс: ' + t.state + ', прогресс ' + t.прогресс);
+  check('взрыв не мгновенный', fuse.rightAfter.exploded === false);
+  check('фитиль загорелся', fuse.rightAfter.burning === true);
+  check('показывается накал', fuse.rightAfter.state === 'ignite', fuse.rightAfter.state);
+  check('взрыв случился близко к заданному фитилю',
+        fuse.boomAt !== null && Math.abs(fuse.boomAt - fuse.fuseTime) < 120,
+        fuse.boomAt + ' мс против ' + fuse.fuseTime + ' заданных');
+  check('птица убрана после взрыва', fuse.birdsLeft === 0, fuse.birdsLeft);
 
   console.log('\n--- 7з. КАМЕРА МЕНЯЕТ МАСШТАБ ---');
   const zoom = await page.evaluate(async () => {

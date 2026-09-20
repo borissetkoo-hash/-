@@ -402,6 +402,35 @@ class Bird extends Entity {
        назад, вдоль резинки. Ровно это здесь и воспроизводится. */
     this.visualAngle = 0;
     this.impactTimer = 0;      // сколько ещё показывать лицо удара, в мс
+
+    // Фитиль чёрной птицы: сколько осталось гореть и сколько горел всего
+    this.fuseTimer = 0;
+    this.fuseTotal = 0;
+    this.exploded = false;
+  }
+
+  /* ---------------------------------------------------------------------------
+     ПОДЖЕЧЬ ФИТИЛЬ
+     Возвращает true, если поджиг случился именно сейчас. Повторный вызов,
+     пока фитиль уже горит, ничего не делает: иначе птица, задевшая подряд три
+     доски, перезапускала бы отсчёт и не взрывалась бы никогда.
+     --------------------------------------------------------------------------- */
+  startFuse(ms) {
+    if (this.fuseTotal > 0 || this.exploded || !this.alive) return false;
+    this.abilityUsed = true;
+    this.fuseTotal = ms;
+    this.fuseTimer = ms;
+    return true;
+  }
+
+  // Насколько фитиль прогорел, от 0 до 1. По этому числу выбирается кадр накала.
+  fuseProgress() {
+    if (this.fuseTotal <= 0) return 0;
+    return Math.min(1, 1 - this.fuseTimer / this.fuseTotal);
+  }
+
+  isFuseBurning() {
+    return this.fuseTotal > 0 && this.fuseTimer > 0;
   }
 
   /* ---------------------------------------------------------------------------
@@ -410,6 +439,8 @@ class Bird extends Entity {
      Благодаря этому можно перенарезать спрайт-лист, и здесь ничего не менять.
      --------------------------------------------------------------------------- */
   animState() {
+    // Накал важнее всего остального: горящий фитиль надо показывать всегда
+    if (this.isFuseBurning()) return 'ignite';
     if (this.impactTimer > 0) return 'impact';
 
     if (!this.launched) {
@@ -427,6 +458,7 @@ class Bird extends Entity {
 
   update(dt) {
     if (this.impactTimer > 0) this.impactTimer -= dt;
+    if (this.fuseTimer > 0) this.fuseTimer -= dt;
 
     if (this.launched) {
       const v = this.body.velocity;
@@ -485,7 +517,11 @@ class Bird extends Entity {
       }
 
       case 'bomb': {
-        return { kind: 'bomb', x: this.x, y: this.y };
+        /* Взрыв не происходит прямо сейчас. Поджигаем фитиль, а рванёт он
+           через fuseTime миллисекунд — см. config.js. Игра следит за концом
+           отсчёта сама, здесь достаточно сообщить, что фитиль зажжён. */
+        this.startFuse(CONFIG.abilities.fuseTime);
+        return { kind: 'fuse', x: this.x, y: this.y };
       }
 
       case 'egg': {
@@ -505,7 +541,20 @@ class Bird extends Entity {
     // Сначала пробуем нарисовать настоящий спрайт нужного выражения лица
     const set = Assets.set('bird_' + this.type);
     if (set) {
-      const frame = set.roles[this.animState()];
+      const state = this.animState();
+      let frame = set.roles[state];
+
+      /* Накал задан НЕ одним кадром, а списком: птица последовательно
+         раскаляется. Выбираем кадр по тому, насколько прогорел фитиль.
+         Math.min нужен на случай, когда прогресс ровно единица: без него
+         индекс вышел бы за конец массива и кадра не нашлось бы. */
+      if (state === 'ignite' && Array.isArray(frame)) {
+        const i = Math.min(frame.length - 1, Math.floor(this.fuseProgress() * frame.length));
+        frame = frame[i];
+      } else if (state === 'ignite' && frame === undefined) {
+        frame = set.roles.fly;      // у этой птицы кадров накала нет
+      }
+
       if (frame !== undefined &&
           Assets.drawFrame(ctx, 'bird_' + this.type, frame,
                            this.x, this.y, this.radius * 2, this.visualAngle)) {

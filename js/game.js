@@ -254,6 +254,17 @@ const Game = {
       if (bodyB.gameEntity instanceof Bird) bodyB.gameEntity.registerHit();
     }
 
+    /* Чёрная птица подрывается и от сильного удара, а не только по нажатию.
+       Так она ведёт себя в оригинале: врезалась в камень — рвануло. */
+    if (energy > CONFIG.damage.fuseImpactEnergy) {
+      for (const body of [bodyA, bodyB]) {
+        const entity = body.gameEntity;
+        if (entity instanceof Bird && entity.launched && entity.spec.ability === 'bomb') {
+          entity.startFuse(CONFIG.abilities.fuseTime);
+        }
+      }
+    }
+
     // Пыль в месте сильного удара — чисто для ощущения веса
     if (energy > 60) {
       const mx = (bodyA.position.x + bodyB.position.x) / 2;
@@ -395,6 +406,29 @@ const Game = {
     }
   },
 
+  /* ---------------------------------------------------------------------------
+     ФИТИЛИ
+     ---------------------------------------------------------------------------
+     Чёрная птица не взрывается мгновенно: она сначала накаляется. Здесь
+     проверяется, у кого фитиль догорел, и только тогда создаётся взрыв.
+
+     Флаг exploded обязателен. Без него птица, которую не успели убрать с поля
+     за один кадр, попала бы сюда дважды и взорвалась бы два раза подряд. */
+  _updateFuses() {
+    for (const bird of this.birds.slice()) {
+      if (bird.exploded || bird.fuseTotal <= 0 || bird.fuseTimer > 0) continue;
+
+      bird.exploded = true;
+      this.pendingExplosions.push({
+        x: bird.x, y: bird.y,
+        radius: CONFIG.abilities.bombRadius,
+        force: CONFIG.abilities.bombForce,
+        damage: CONFIG.abilities.bombDamage
+      });
+      this.queueDestroy(bird);
+    }
+  },
+
   addScore(points, x, y) {
     this.score += points;
     if (x !== undefined) Effects.scorePopup(x, y, '+' + points);
@@ -498,14 +532,10 @@ const Game = {
       }
       Effects.dust(this.activeBird.x, this.activeBird.y, 4);
 
-    } else if (result.kind === 'bomb') {
-      this.pendingExplosions.push({
-        x: result.x, y: result.y,
-        radius: CONFIG.abilities.bombRadius,
-        force: CONFIG.abilities.bombForce,
-        damage: CONFIG.abilities.bombDamage
-      });
-      this.queueDestroy(this.activeBird);
+    } else if (result.kind === 'fuse') {
+      /* Взрыв не здесь. Птица подожгла фитиль, а рванёт он в _updateFuses,
+         когда отсчёт дойдёт до нуля. Тут только искры для наглядности. */
+      Effects.dust(result.x, result.y, 5);
 
     } else if (result.kind === 'egg') {
       const bird = this.activeBird;
@@ -562,20 +592,23 @@ const Game = {
     // 3. Урон от придавливания: свинья под завалом должна погибать
     this._applyCrushDamage(dt);
 
-    // 4. Обновляем персонажей: моргание свиней, выражение лица и поворот птиц
+    // 4. Догоревшие фитили превращаются во взрывы
+    this._updateFuses();
+
+    // 5. Обновляем персонажей: моргание свиней, выражение лица и поворот птиц
     for (const pig of this.pigs) pig.update(dt);
     for (const bird of this.birds) bird.update(dt);
 
-    // 5. Частицы
+    // 6. Частицы
     Effects.update();
 
-    // 6. Логика хода
+    // 7. Логика хода
     this._updateTurn(dt);
 
-    // 7. Камера
+    // 8. Камера
     this._updateCamera();
 
-    // 8. Тряска экрана затухает
+    // 9. Тряска экрана затухает
     if (this.shake > 0) this.shake *= 0.9;
   },
 

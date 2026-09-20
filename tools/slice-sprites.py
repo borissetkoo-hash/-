@@ -58,6 +58,25 @@ ROLES = {
         'impact': 7,   # момент удара, глаза зажмурены
         'dazed':  8,   # приземлилась, синяк под глазом
     },
+    'bird_black': {
+        'idle':   0,    # спокойная на рогатке
+        'aim':    5,    # натянуто, орёт
+        'fly':    6,    # в полёте, оскал
+        'impact': 10,   # момент удара, глаза навыкате
+        'dazed':  11,   # приземлилась, щурится
+        # РАЗОГРЕВ ПЕРЕД ВЗРЫВОМ. На листе есть три кадра, где птица
+        # раскаляется: коричневая, красная, ярко-оранжевая. Это подарок:
+        # взрыв перестаёт быть мгновенным и получает понятную игроку
+        # подготовку. Кадры проигрываются по очереди, пока горит фитиль.
+        'ignite': [7, 8, 9],
+    },
+    'bird_yellow': {
+        'idle':   0,    # спокойная
+        'aim':    3,    # натянуто, брови домиком
+        'fly':    6,    # в полёте, зубы стиснуты
+        'impact': 7,    # удар, глаза зажмурены
+        'dazed':  8,    # синяк и язык набок
+    },
     'pig_green': {
         # Три стадии повреждений, в каждой: обычный кадр, моргание, реакция на удар
         'stages': [
@@ -87,10 +106,8 @@ ROLES = {
 #     обводка     чёрная,   яркость почти ноль                            -> не трогаем
 # Без такого отбора у синей птицы позеленел бы клюв.
 VARIANTS = {
-    'yellow': {'hue': 0.13, 'sat': 1.00, 'val': 1.06},   # тон 47 градусов
-    'blue':   {'hue': 0.55, 'sat': 0.92, 'val': 1.00},   # тон 198 градусов
-    'black':  {'hue': 0.62, 'sat': 0.10, 'val': 0.30},   # почти чёрный
-    'white':  {'hue': 0.11, 'sat': 0.09, 'val': 1.50},   # почти белый, тёплого оттенка
+    'blue':  {'hue': 0.55, 'sat': 0.92, 'val': 1.00},   # тон 198 градусов
+    'white': {'hue': 0.11, 'sat': 0.09, 'val': 1.50},   # почти белый, тёплого оттенка
 }
 
 
@@ -131,10 +148,10 @@ def recolor_frame(img, spec):
     return img
 
 
-def make_variants(src_dir, info, out_root):
+def make_variants(src_dir, info, out_root, variants=None):
     """Создать цветные варианты птицы и вернуть описания наборов."""
     made = {}
-    for name, spec in VARIANTS.items():
+    for name, spec in (variants if variants is not None else VARIANTS).items():
         out_dir = os.path.join(out_root, 'birds', name)
         os.makedirs(out_dir, exist_ok=True)
         for fname in info['frames']:
@@ -323,10 +340,21 @@ def sort_reading_order(boxes):
 
 
 def dominant_color(img, boxes):
-    """Самый частый насыщенный цвет на листе — это цвет туловища.
+    """Самый частый непрозрачный цвет на листе — это цвет туловища.
 
-    Определяется автоматически, а не задаётся вручную, чтобы скрипт одинаково
-    работал и с красной птицей, и с зелёной свиньёй.
+    ЗДЕСЬ БЫЛ БАГ. Сначала я отбрасывал тёмные и малонасыщенные цвета,
+    рассуждая так: «чёрный — это обводка, а не тело, её считать не надо».
+    На красной и жёлтой птице это работало. А на ЧЁРНОЙ птице отбор выкинул
+    ровно то, что искали, и за цвет тела была принята оранжевая полоска клюва.
+    Радиус туловища получился 20 пикселей вместо 44, и птица нарисовалась бы
+    в игре вдвое больше своего физического тела.
+
+    Правильное рассуждение: обводка — это тонкая линия, а тело — большая
+    заливка. Значит, по количеству пикселей тело победит обводку само, без
+    всякого отбора по цвету. Фильтр не просто был лишним, он был вредным.
+
+    Урок: фильтр, который «очевидно правильный» на двух примерах, стоит
+    проверить на третьем, не похожем на первые два.
     """
     counter = Counter()
     px = img.load()
@@ -335,9 +363,6 @@ def dominant_color(img, boxes):
             for x in range(x0, x1 + 1, 2):
                 r, g, b, a = px[x, y]
                 if a < 200:
-                    continue
-                mx, mn = max(r, g, b), min(r, g, b)
-                if mx < 60 or mx - mn < 45:   # почти чёрный или почти серый
                     continue
                 counter[(r // 12 * 12, g // 12 * 12, b // 12 * 12)] += 1
     return counter.most_common(1)[0][0]
@@ -456,24 +481,64 @@ def write_sprites_js(result, path):
     print('\nманифест записан: %s' % path)
 
 
+def parse_args(argv):
+    """Разобрать аргументы вида  вид:имя=путь  например  bird:black=лист.png
+
+    Раньше скрипт принимал ровно два файла в жёстком порядке: птица и свинья.
+    Как только листов стало больше двух, такой порядок перестал работать.
+    Теперь каждый аргумент сам себя описывает, и их может быть сколько угодно.
+    """
+    jobs = []
+    for arg in argv:
+        if ':' not in arg or '=' not in arg:
+            raise SystemExit('Не понял аргумент: %s\nОжидается вид:имя=путь, '
+                             'например bird:red=sheet.png' % arg)
+        head, path = arg.split('=', 1)
+        kind, name = head.split(':', 1)
+        if kind not in ('bird', 'pig'):
+            raise SystemExit('Неизвестный вид "%s", бывают bird и pig' % kind)
+        jobs.append((kind, name, path))
+    return jobs
+
+
+TITLES = {
+    'red': 'Красная птица', 'black': 'Чёрная птица', 'yellow': 'Жёлтая птица',
+    'blue': 'Синяя птица', 'white': 'Белая птица', 'green': 'Свинья',
+}
+
+
 if __name__ == '__main__':
-    bird_sheet, pig_sheet = sys.argv[1], sys.argv[2]
+    jobs = parse_args(sys.argv[1:])
+    if not jobs:
+        raise SystemExit('Нечего резать. Пример:\n'
+                         '  python3 tools/slice-sprites.py bird:red=red.png pig:green=pigs.png')
 
     result = {}
-    bird_dir = os.path.join(OUT_ROOT, 'birds', 'red')
-    pig_dir = os.path.join(OUT_ROOT, 'pigs', 'green')
+    have_sheet = set()
+    red_dir = None
 
-    result['bird_red'] = slice_sheet(bird_sheet, bird_dir, 'Красная птица')
-    result['bird_red']['dir'] = 'assets/birds/red/'
-    result['bird_red']['roles'] = ROLES['bird_red']
-    contact_sheet(bird_dir, result['bird_red'], os.path.join(OUT_ROOT, '..', 'contact-birds.png'))
+    for kind, name, path in jobs:
+        folder = 'birds' if kind == 'bird' else 'pigs'
+        out_dir = os.path.join(OUT_ROOT, folder, name)
+        key = kind + '_' + name
 
-    print('\n=== Цветные варианты птицы из того же листа ===')
-    result.update(make_variants(bird_dir, result['bird_red'], OUT_ROOT))
+        info = slice_sheet(path, out_dir, TITLES.get(name, key))
+        info['dir'] = 'assets/%s/%s/' % (folder, name)
+        info['roles'] = ROLES.get(key, ROLES['bird_red'] if kind == 'bird' else ROLES['pig_green'])
+        result[key] = info
+        have_sheet.add(name)
+        if name == 'red':
+            red_dir = out_dir
 
-    result['pig_green'] = slice_sheet(pig_sheet, pig_dir, 'Свинья')
-    result['pig_green']['dir'] = 'assets/pigs/green/'
-    result['pig_green']['roles'] = ROLES['pig_green']
-    contact_sheet(pig_dir, result['pig_green'], os.path.join(OUT_ROOT, '..', 'contact-pigs.png'))
+        contact_sheet(out_dir, info, os.path.join(OUT_ROOT, '..', 'contact-%s.png' % name))
+
+    # Тем птицам, для которых листа не прислали, делаем перекраску красной
+    missing = {n: v for n, v in VARIANTS.items() if n not in have_sheet}
+    if missing and red_dir:
+        print('\n=== Перекраска для птиц без своего листа ===')
+        made = make_variants(red_dir, result['bird_red'], OUT_ROOT, missing)
+        result.update(made)
+    elif missing:
+        print('\nНет листа красной птицы, перекраску пропускаю: ' + ', '.join(missing))
 
     write_sprites_js(result, os.path.join(os.path.dirname(__file__), '..', 'js', 'sprites.js'))
