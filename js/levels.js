@@ -108,6 +108,26 @@ function putRoof(out, apexX, surface, length, angle, material, thickness = T, ga
   out.blocks.push(b(apexX + footX + cw / 2 + 1, surface - ch / 2, cw, ch, 'stone'));
 }
 
+/* ПЛАТФОРМА РЕЛЬЕФА — земляной выступ, на котором стоят постройки.
+
+   На настоящих уровнях земля не плоская. Постройки стоят на выступах разной
+   высоты, между выступами провалы, и это меняет игру сильнее, чем кажется:
+
+     - низкий настильный выстрел врезается в торец плато и не долетает,
+       поэтому приходится брать выше и терять точность;
+     - обломки и свиньи сваливаются в провалы, и падение само по себе убивает;
+     - постройка на высоком плато ближе к траектории, а на низком дальше,
+       то есть высота работает как ещё один параметр сложности.
+
+   Платформа задаётся тремя числами: центр, ширина и высота ВЕРХНЕЙ грани.
+   Вниз она уходит ниже линии земли и там обрезается, поэтому дна у неё нет и
+   считать его не надо. Функция возвращает ту же верхнюю грань, чтобы дальше
+   строить на ней теми же put-помощниками, что и на земле. */
+function putPlatform(out, x, width, top) {
+  out.terrain.push({ x, width, top });
+  return top;
+}
+
 /* Сдвинуть готовую постройку целиком по горизонтали.
 
    Зачем: сначала удобно спроектировать крепость вокруг круглых координат вроде
@@ -120,6 +140,7 @@ function putRoof(out, apexX, surface, length, angle, material, thickness = T, ga
 function moveAll(out, dx) {
   for (const block of out.blocks) block.x += dx;
   for (const pig of out.pigs) pig.x += dx;
+  for (const part of out.terrain) part.x += dx;
   return out;
 }
 
@@ -142,7 +163,7 @@ const FORT_OFFSET = 180;
    свиньи внутри, король и ящик динамита на крыше, ледяной сарай сбоку.
    ============================================================================= */
 function level1() {
-  const out = { blocks: [], pigs: [] };
+  const out = { blocks: [], pigs: [], terrain: [] };
 
   // --- Первый этаж ---
   const s1 = putColumns(out, [1150, 1290, 1430, 1570], GY, 110, 'wood');
@@ -180,7 +201,8 @@ function level1() {
     theme: 'day',
     birds: ['red', 'red', 'yellow', 'white', 'blue', 'black'],
     blocks: out.blocks,
-    pigs: out.pigs
+    pigs: out.pigs,
+    terrain: out.terrain
   };
 }
 
@@ -191,7 +213,7 @@ function level1() {
    Это и есть суть Angry Birds: не колотить по стенам, а искать слабое место.
    ============================================================================= */
 function level2() {
-  const out = { blocks: [], pigs: [] };
+  const out = { blocks: [], pigs: [], terrain: [] };
 
   // --- Хрупкий ледяной фундамент: вот сюда и надо целиться ---
   const s1 = putColumns(out, [1180, 1320, 1460, 1600], GY, 100, 'ice', 24);
@@ -223,7 +245,8 @@ function level2() {
     theme: 'day',
     birds: ['red', 'yellow', 'white', 'yellow', 'black', 'blue'],
     blocks: out.blocks,
-    pigs: out.pigs
+    pigs: out.pigs,
+    terrain: out.terrain
   };
 }
 
@@ -235,7 +258,7 @@ function level2() {
    Углы задаются в РАДИАНАХ: Math.PI / 6 это 30 градусов.
    ============================================================================= */
 function level3() {
-  const out = { blocks: [], pigs: [] };
+  const out = { blocks: [], pigs: [], terrain: [] };
 
   // --- Две каменные опорные башни ---
   const t1 = putColumns(out, [1130, 1210], GY, 120, 'stone', 24);
@@ -275,7 +298,8 @@ function level3() {
     theme: 'volcano',
     birds: ['black', 'yellow', 'white', 'blue', 'red', 'black'],
     blocks: out.blocks,
-    pigs: out.pigs
+    pigs: out.pigs,
+    terrain: out.terrain
   };
 }
 
@@ -295,16 +319,21 @@ function level3() {
    Здесь без них не обойтись, и они перестают быть украшением.
    ============================================================================= */
 function level4() {
-  const out = { blocks: [], pigs: [] };
+  const out = { blocks: [], pigs: [], terrain: [] };
+
+  /* Вся крепость стоит на земляном плато. Это не украшение: теперь настильный
+     выстрел врезается в торец плато и не долетает вовсе, и приходится брать
+     выше. Высота плато прямо переводится в сложность прицеливания. */
+  const ground = putPlatform(out, 1425, 720, GY - 80);
 
   // --- Опоры навеса. Слева лёд, справа камень: асимметрия и есть подсказка ---
-  const left  = putColumns(out, [1150, 1230], GY, 120, 'ice', 24);
-  putColumns(out, [1620, 1700], GY, 120, 'stone', 24);
+  const left  = putColumns(out, [1150, 1230], ground, 120, 'ice', 24);
+  putColumns(out, [1620, 1700], ground, 120, 'stone', 24);
 
   // --- Свиньи под навесом: прямым попаданием их не достать ---
-  putPig(out, 1330, GY, 20);
-  putPig(out, 1425, GY, 20);
-  putPig(out, 1520, GY, 20);
+  putPig(out, 1330, ground, 20);
+  putPig(out, 1425, ground, 20);
+  putPig(out, 1520, ground, 20);
 
   // --- Сам навес: длинная тяжёлая плита ---
   const roofTop = putBeam(out, 1425, left, 620, 'stone', 30);
@@ -316,8 +345,8 @@ function level4() {
   putPig(out, 1425, hutTop, 24, 'king');
   putBox(out, 1580, roofTop, 36, 'tnt');
 
-  // --- Одна свинья снаружи, справа: чтобы первый выстрел не был безнадёжным ---
-  putPig(out, 1790, GY, 18);
+  // --- Одна свинья снаружи, ВНИЗУ под обрывом: её достать проще всего ---
+  putPig(out, 1820, GY, 18);
 
   moveAll(out, FORT_OFFSET);
 
@@ -326,7 +355,8 @@ function level4() {
     theme: 'day',
     birds: ['white', 'blue', 'yellow', 'black', 'red'],
     blocks: out.blocks,
-    pigs: out.pigs
+    pigs: out.pigs,
+    terrain: out.terrain
   };
 }
 
@@ -346,7 +376,7 @@ function level4() {
    соседние. Один точный выстрел может увести весь ледник целиком.
    ============================================================================= */
 function level5() {
-  const out = { blocks: [], pigs: [] };
+  const out = { blocks: [], pigs: [], terrain: [] };
 
   // --- Три ледяные башни одинаковой высоты ---
   const ice = putColumns(out, [1150, 1240, 1380, 1470, 1610, 1700], GY, 90, 'ice', 26);
@@ -378,11 +408,70 @@ function level5() {
     theme: 'winter',
     birds: ['yellow', 'blue', 'blue', 'black', 'red'],
     blocks: out.blocks,
-    pigs: out.pigs
+    pigs: out.pigs,
+    terrain: out.terrain
   };
 }
 
-const LEVELS = [level1(), level2(), level3(), level4(), level5()];
+/* =============================================================================
+   УРОВЕНЬ 6 — ОБРЫВ
+   -----------------------------------------------------------------------------
+   Уровень целиком про рельеф. Два плато разной высоты, между ними провал.
+
+   Что это меняет:
+     - низкий выстрел бьётся о торец ближнего плато, надо брать навесом;
+     - дальнее плато выше ближнего, поэтому одной настройки прицела на оба
+       не хватает: каждый выстрел считается заново;
+     - всё, что сваливается в провал, летит до самой земли, а падение с такой
+       высоты убивает само по себе, без всякой птицы.
+
+   Провал между плато шириной девяносто пикселей: достаточно, чтобы в него
+   проваливались доски и свиньи, и недостаточно, чтобы туда можно было целиться
+   специально. Он работает как ловушка, а не как мишень.
+   ============================================================================= */
+function level6() {
+  const out = { blocks: [], pigs: [], terrain: [] };
+
+  // --- Ближнее плато, пониже ---
+  const near = putPlatform(out, 1250, 360, GY - 80);
+
+  const n1 = putColumns(out, [1130, 1250, 1370], near, 90, 'wood');
+  putPig(out, 1190, near, 18);
+  putPig(out, 1310, near, 18);
+
+  const n2 = putBeam(out, 1250, n1, 300, 'wood');
+  putPig(out, 1140, n2, 17);
+  putBox(out, 1370, n2, 36, 'tnt');
+
+  const n3 = putColumns(out, [1190, 1310], n2, 70, 'wood');
+  const n4 = putBeam(out, 1250, n3, 170, 'wood');
+  putPig(out, 1250, n4, 22, 'king');
+
+  // --- Провал: между 1430 и 1520 земли нет вообще ---
+
+  // --- Дальнее плато, повыше и каменное ---
+  const far = putPlatform(out, 1640, 240, GY - 130);
+
+  const f1 = putColumns(out, [1560, 1720], far, 80, 'stone', 22);
+  putPig(out, 1640, far, 20);
+
+  const f2 = putBeam(out, 1640, f1, 220, 'stone', 26);
+  putBox(out, 1580, f2, 36, 'tnt');
+  putPig(out, 1690, f2, 18);
+
+  moveAll(out, FORT_OFFSET);
+
+  return {
+    name: 'Обрыв',
+    theme: 'day',
+    birds: ['red', 'yellow', 'blue', 'black', 'white'],
+    blocks: out.blocks,
+    pigs: out.pigs,
+    terrain: out.terrain
+  };
+}
+
+const LEVELS = [level1(), level2(), level3(), level4(), level5(), level6()];
 
 /* Темы оформления фона. Просто наборы цветов, которые читает рендер. */
 const THEMES = {

@@ -306,7 +306,11 @@ function check(name, ok, extra) {
     const rows = [];
     for (let i = 0; i < LEVELS.length + 2; i++) {
       Game.loadLevel(i % LEVELS.length);
-      const expected = Game.blocks.length + Game.pigs.length + Game.birds.length + 3;
+      /* Земля и две стены создаются один раз и живут всегда, отсюда тройка.
+         Выступы рельефа создаются заново на каждом уровне, поэтому их тоже
+         надо учесть: иначе проверка ругалась бы на честные тела. */
+      const expected = Game.blocks.length + Game.pigs.length + Game.birds.length +
+                       Game.platforms.length + 3;
       rows.push({ n: i, level: Game.level.name, bodies: Physics.allBodies().length, expected });
     }
     return rows;
@@ -543,6 +547,74 @@ function check(name, ok, extra) {
   check('боевой масштаб крупнее обзорного', zoom.fly > zoom.aim, zoom.aim + ' -> ' + zoom.fly);
   check('на старте камера в обзорном масштабе', Math.abs(zoom.atRest - zoom.aim) < 0.01);
   check('уровень целиком помещается в обзор', zoom.right >= 1700, 'правый край ' + zoom.right);
+
+  console.log('\n--- 7м. РЕЛЬЕФ НЕ ЗАКРЫВАЕТ УРОВЕНЬ ПОЛНОСТЬЮ ---');
+  /* ТОНКОЕ МЕСТО. Предсказание траектории считает полёт в пустом мире-двойнике,
+     где нет ни построек, ни рельефа. Значит, проверка «дальние свиньи
+     достижимы» смотрит, куда птица УПАЛА БЫ, и ничего не знает про земляной
+     выступ, в который она врежется по дороге.
+
+     Поэтому здесь путь проверяется вручную: не заходит ли он внутрь плато
+     раньше, чем долетит до крепости. Если ни один угол прицеливания не
+     перелетает выступ, уровень непроходим, а прежние проверки этого не
+     заметят и радостно отрапортуют «всё хорошо». */
+  const terrainCheck = await page.evaluate(() => {
+    const out = [];
+    for (let lvl = 0; lvl < LEVELS.length; lvl++) {
+      Game.loadLevel(lvl);
+      const terrain = Game.level.terrain || [];
+      if (!terrain.length) continue;
+
+      let fortX = Infinity;
+      for (const bl of Game.level.blocks) fortX = Math.min(fortX, bl.x - bl.w / 2);
+
+      const sx = CONFIG.slingshot.x, sy = CONFIG.slingshot.y;
+      const pw = CONFIG.slingshot.power;
+      let clear = 0, blocked = 0, bestReach = 0;
+
+      for (let deg = 10; deg <= 75; deg += 5) {
+        const a = deg * Math.PI / 180;
+        const px = sx - Math.cos(a) * CONFIG.slingshot.maxPull;
+        const py = sy + Math.sin(a) * CONFIG.slingshot.maxPull;
+        const v = { x: (sx - px) * pw, y: (sy - py) * pw };
+        const path = Physics.predictTrajectory(px, py, v.x, v.y, 600, CONFIG.world.airFriction);
+
+        // Где путь впервые входит внутрь выступа
+        let hitX = null;
+        for (const pt of path) {
+          for (const t of terrain) {
+            if (pt.x > t.x - t.width / 2 && pt.x < t.x + t.width / 2 && pt.y > t.top) {
+              hitX = pt.x; break;
+            }
+          }
+          if (hitX !== null) break;
+        }
+
+        const reach = hitX !== null ? hitX : (path.length ? path[path.length - 1].x : 0);
+        if (reach > bestReach) bestReach = reach;
+        if (reach >= fortX) clear++; else blocked++;
+      }
+
+      out.push({
+        level: Game.level.name, platforms: terrain.length,
+        fortX: Math.round(fortX), clear, blocked, bestReach: Math.round(bestReach)
+      });
+    }
+    return out;
+  });
+
+  for (const t of terrainCheck) {
+    console.log('  ' + t.level + ': выступов ' + t.platforms + ', крепость с ' + t.fortX +
+                '. Углов перелетает ' + t.clear + ', упирается в рельеф ' + t.blocked +
+                ', лучший заход до ' + t.bestReach);
+  }
+  check('на уровнях с рельефом есть чем стрелять',
+        terrainCheck.every(t => t.clear >= 4),
+        terrainCheck.map(t => t.level + ': ' + t.clear).join('; '));
+  check('рельеф всё-таки мешает части выстрелов',
+        terrainCheck.every(t => t.blocked >= 1),
+        'иначе выступ ни на что не влияет: ' +
+        terrainCheck.map(t => t.level + ': ' + t.blocked).join('; '));
 
   console.log('\n--- 7л. КАМЕРУ МОЖНО ОТВЕСТИ, ЧТОБЫ ОСМОТРЕТЬ УРОВЕНЬ ---');
   /* Новые уровни шире того, что помещается в кадр при прицеливании. Значит,

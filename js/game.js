@@ -146,6 +146,11 @@ const Game = {
     for (const p of this.level.pigs) {
       right = Math.max(right, p.x + p.radius);
     }
+    // Рельеф тоже часть уровня: если плато тянется дальше построек,
+    // камера должна знать об этом, иначе край обрыва окажется за кадром
+    for (const t of (this.level.terrain || [])) {
+      right = Math.max(right, t.x + t.width / 2);
+    }
     this.levelRight = right + 140;
   },
 
@@ -171,9 +176,31 @@ const Game = {
     this.blocks = [];
     this.pigs = [];
     this.birds = [];
+    this.platforms = [];
     this.pendingRemoval = [];
     this.pendingExplosions = [];
     Effects.clear();
+
+    /* ---------------------------------------------------------------------
+       РЕЛЬЕФ
+       ---------------------------------------------------------------------
+       Каждый выступ — обычное СТАТИЧНОЕ тело, такое же, как земля. Статичное
+       значит «бесконечная масса, не двигается»: об него можно удариться, на
+       нём можно стоять, но столкнуть его нельзя.
+
+       Вниз выступ уходит на 140 пикселей ниже линии земли. Это не лень, а
+       расчёт: нижнего края не видно, он закрыт грунтом, зато не надо думать,
+       где у выступа дно и не провалится ли сквозь него доска.
+       --------------------------------------------------------------------- */
+    for (const part of (this.level.terrain || [])) {
+      const height = (CONFIG.ground.y + 140) - part.top;
+      const body = Matter.Bodies.rectangle(
+        part.x, part.top + height / 2, part.width, height,
+        { isStatic: true, friction: CONFIG.ground.friction, label: 'platform' }
+      );
+      Physics.add(body);
+      this.platforms.push({ x: part.x, width: part.width, top: part.top, height, body });
+    }
 
     for (const data of this.level.blocks) {
       const block = new Block(data.x, data.y, data.w, data.h, data.material, data.angle);
@@ -893,6 +920,66 @@ const Game = {
       ctx.beginPath();
       ctx.moveTo(x, gy + 26);
       ctx.lineTo(x + 26, gy + 52);
+      ctx.stroke();
+    }
+
+    this._drawPlatforms(ctx);
+  },
+
+  /* ---------------------------------------------------------------------------
+     ВЫСТУПЫ РЕЛЬЕФА
+     ---------------------------------------------------------------------------
+     Рисуются той же парой цветов, что и земля: тело грунта и трава сверху.
+     Единственная вольность — скруглённые верхние углы. Прямой угол читается
+     как бетонная плита, скруглённый как земля, хотя физически это один и тот
+     же прямоугольник. Форма тела и форма картинки не обязаны совпадать, если
+     разница меньше пары пикселей.
+     --------------------------------------------------------------------------- */
+  _drawPlatforms(ctx) {
+    if (!this.platforms || !this.platforms.length) return;
+    const t = this.theme;
+
+    for (const pl of this.platforms) {
+      const left = pl.x - pl.width / 2;
+      const r = Math.min(22, pl.width / 2);
+
+      ctx.fillStyle = t.groundBody;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(left, pl.top, pl.width, pl.height, [r, r, 0, 0]);
+      } else {
+        ctx.rect(left, pl.top, pl.width, pl.height);
+      }
+      ctx.fill();
+
+      // Трава по верхней грани, с теми же скруглениями
+      ctx.save();
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(left, pl.top, pl.width, pl.height, [r, r, 0, 0]);
+      else ctx.rect(left, pl.top, pl.width, pl.height);
+      ctx.clip();
+      ctx.fillStyle = t.groundTop;
+      ctx.fillRect(left, pl.top, pl.width, 14);
+
+      // Штриховка на боках выступа
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 2;
+      for (let y = pl.top + 34; y < pl.top + pl.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(left + 8, y);
+        ctx.lineTo(left + 34, y + 24);
+        ctx.moveTo(left + pl.width - 40, y + 12);
+        ctx.lineTo(left + pl.width - 14, y + 36);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Тёмная кромка под травой: край выступа должен читаться силуэтом
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(left, pl.top + 15);
+      ctx.lineTo(left + pl.width, pl.top + 15);
       ctx.stroke();
     }
   },

@@ -122,7 +122,8 @@ let problems = 0;
 for (let li = 0; li < LEVELS.length; li++) {
   const level = LEVELS[li];
   console.log('\n=== Уровень ' + (li + 1) + ': ' + level.name + ' ===');
-  console.log('    блоков: ' + level.blocks.length + ', свиней: ' + level.pigs.length);
+  console.log('    блоков: ' + level.blocks.length + ', свиней: ' + level.pigs.length +
+              ', выступов рельефа: ' + ((level.terrain || []).length));
 
   const blocks = level.blocks;
   const pigs = level.pigs;
@@ -178,6 +179,17 @@ for (let li = 0; li < LEVELS.length; li++) {
     const l = leftOf(item), r = rightOf(item);
 
     let support = CONFIG.ground.y;    // земля это опора по умолчанию
+
+    /* Выступ рельефа — тоже опора. Без этой проверки всё, что стоит на плато,
+       считалось бы висящим в воздухе, потому что под ним нет ни одного блока,
+       а до настоящей земли далеко. */
+    for (const part of (level.terrain || [])) {
+      const pl = part.x - part.width / 2;
+      const pr = part.x + part.width / 2;
+      if (pr < l + 1 || pl > r - 1) continue;
+      if (part.top >= bot - 1 && part.top < support) support = part.top;
+    }
+
     for (const other of all) {
       if (other === item) continue;
       if (rightOf(other) < l + 1 || leftOf(other) > r - 1) continue;  // не под нами
