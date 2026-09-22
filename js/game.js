@@ -199,6 +199,8 @@ const Game = {
 
     this.camera.x = 0;
     this.camera.targetX = 0;
+    this.camera.manual = false;
+    this.drag = null;
 
     // Уровень поменялся — пересчитываем, насколько далеко он тянется
     this._measureLevel();
@@ -336,12 +338,21 @@ const Game = {
 
   destroyEntity(entity) {
     if (entity instanceof Pig) {
+      /* Сначала убираем из списка, и только потом начисляем очки.
+
+       Порядок был обратный, и счётчик свиней в панели отставал на одну:
+       addScore обновляет панель, а на тот момент погибшая свинья ещё лежала
+       в списке и считалась живой. На экране было «свиней 6» при пяти живых.
+
+       Мелочь, но показательная: если функция что-то обновляет, состояние надо
+       привести в порядок ДО её вызова, а не после. */
+      this.pigs = this.pigs.filter(p => p !== entity);
       this.addScore(CONFIG.score.perPig, entity.x, entity.y);
       Effects.pop(entity.x, entity.y, CONFIG.pig.color);
       this.shake = Math.max(this.shake, 6);
-      this.pigs = this.pigs.filter(p => p !== entity);
 
     } else if (entity instanceof Block) {
+      this.blocks = this.blocks.filter(b => b !== entity);
       // За яйцо очки не начисляются: это свой снаряд, а не постройка врага
       if (entity.material !== 'egg') {
         this.addScore(CONFIG.score.perBlock, entity.x, entity.y);
@@ -364,7 +375,6 @@ const Game = {
           damage: CONFIG.abilities.eggDamage
         });
       }
-      this.blocks = this.blocks.filter(b => b !== entity);
 
     } else if (entity instanceof Bird) {
       this.birds = this.birds.filter(b => b !== entity);
@@ -456,22 +466,44 @@ const Game = {
       // Тап в полёте = способность птицы
       if (this.state === 'flying' && this.activeBird) {
         this.triggerAbility();
+        return;
       }
+
+      /* Мимо птицы и не в полёте — значит, игрок хочет осмотреть уровень.
+         Начинаем тащить камеру. Запоминаем, где палец был вначале и где стояла
+         камера: дальше сдвиг считается от этой пары, а не накапливается по
+         кусочкам. Накопление по кусочкам копило бы ошибку округления. */
+      this.drag = { pointerX: e.clientX, cameraX: this.camera.x };
     });
 
     c.addEventListener('pointermove', (e) => {
-      if (!Slingshot.aiming) return;
-      const w = this.screenToWorld(e.clientX, e.clientY);
-      Slingshot.updateAim(w.x, w.y);
+      if (Slingshot.aiming) {
+        const w = this.screenToWorld(e.clientX, e.clientY);
+        Slingshot.updateAim(w.x, w.y);
+        return;
+      }
+
+      if (this.drag) {
+        // Делим на zoom: палец двигается в пикселях экрана, а камера живёт
+        // в координатах мира, и при отдалении один экранный пиксель это
+        // больше мирового.
+        const shift = (e.clientX - this.drag.pointerX) / this.camera.zoom;
+        const maxX = Math.max(0, CONFIG.world.width - this.viewWidth());
+        this.camera.x = Math.max(0, Math.min(maxX, this.drag.cameraX - shift));
+        this.camera.manual = true;      // не возвращать камеру самой
+      }
     });
 
     const endAim = () => {
+      this.drag = null;
       if (!Slingshot.aiming) return;
       const launched = Slingshot.release();
       if (launched) {
         this.activeBird = launched;
         this.state = 'flying';
         this.settleTimer = 0;
+        // Выстрелили — камера снова сама ведёт птицу
+        this.camera.manual = false;
       }
     };
 
@@ -723,6 +755,12 @@ const Game = {
     if (flying) {
       target = this.activeBird.x - viewW * 0.4;
       k = CONFIG.camera.follow;
+    } else if (this.camera.manual) {
+      /* Игрок сам отвёл камеру, чтобы осмотреть уровень. Насильно возвращать
+         её обратно нельзя: это ровно то, что бесит в играх, где камера
+         «знает лучше». Стоим там, где поставили, до следующего выстрела. */
+      target = this.camera.x;
+      k = 0;
     } else {
       target = 0;                       // возвращаемся к рогатке
       k = CONFIG.camera.returnFollow;

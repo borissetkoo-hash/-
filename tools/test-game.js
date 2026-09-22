@@ -260,7 +260,13 @@ function check(name, ok, extra) {
   check('частицы взрыва созданы', boom.particles > 10, boom.particles);
 
   console.log('\n--- 7. ПРОВЕРКА ВСЕХ УРОВНЕЙ ---');
-  for (let i = 0; i < 3; i++) {
+  /* Количество уровней спрашиваем у самой игры. Раньше здесь стояла тройка, и
+     новый уровень молча оставался без проверки: тест бы прошёл, а уровень мог
+     разваливаться. Число, продублированное в двух местах, всегда рано или
+     поздно расходится. */
+  const levelCount = await page.evaluate(() => LEVELS.length);
+  console.log('  уровней в игре: ' + levelCount);
+  for (let i = 0; i < levelCount; i++) {
     const lv = await page.evaluate((idx) => {
       Game.loadLevel(idx);
       return { name: Game.level.name, blocks: Game.blocks.length, pigs: Game.pigs.length };
@@ -298,8 +304,8 @@ function check(name, ok, extra) {
   // удаляла только подвижные тела. У рогатки копились невидимые препятствия.
   const ghosts = await page.evaluate(() => {
     const rows = [];
-    for (let i = 0; i < 5; i++) {
-      Game.loadLevel(i % 3);
+    for (let i = 0; i < LEVELS.length + 2; i++) {
+      Game.loadLevel(i % LEVELS.length);
       const expected = Game.blocks.length + Game.pigs.length + Game.birds.length + 3;
       rows.push({ n: i, level: Game.level.name, bodies: Physics.allBodies().length, expected });
     }
@@ -313,7 +319,7 @@ function check(name, ok, extra) {
         ghosts.map(r => r.bodies + '/' + r.expected).join(' '));
 
   console.log('\n--- 7г. НА КАЖДОМ УРОВНЕ ПТИЦА УЛЕТАЕТ СВОБОДНО ---');
-  for (let lvl = 0; lvl < 3; lvl++) {
+  for (let lvl = 0; lvl < levelCount; lvl++) {
     const flight = await page.evaluate(async (index) => {
       Game.loadLevel(index);
       const bird = Slingshot.bird;
@@ -374,7 +380,7 @@ function check(name, ok, extra) {
      что максимальная дальность с запасом перекрывает дальний край уровня. */
   const timing = await page.evaluate(() => {
     const out = [];
-    for (let lvl = 0; lvl < 3; lvl++) {
+    for (let lvl = 0; lvl < LEVELS.length; lvl++) {
       Game.loadLevel(lvl);
 
       let fortX = Infinity, farX = 0;
@@ -537,6 +543,94 @@ function check(name, ok, extra) {
   check('боевой масштаб крупнее обзорного', zoom.fly > zoom.aim, zoom.aim + ' -> ' + zoom.fly);
   check('на старте камера в обзорном масштабе', Math.abs(zoom.atRest - zoom.aim) < 0.01);
   check('уровень целиком помещается в обзор', zoom.right >= 1700, 'правый край ' + zoom.right);
+
+  console.log('\n--- 7л. КАМЕРУ МОЖНО ОТВЕСТИ, ЧТОБЫ ОСМОТРЕТЬ УРОВЕНЬ ---');
+  /* Новые уровни шире того, что помещается в кадр при прицеливании. Значит,
+     игрок обязан иметь возможность посмотреть, что там справа. Проверяем и то,
+     что камера отводится, и то, что это не сломало натягивание рогатки:
+     оба действия начинаются с нажатия на холст, и спутать их легко. */
+  await page.evaluate(() => Game.loadLevel(3));
+  await page.waitForTimeout(400);
+
+  const panStart = await page.evaluate(() => Math.round(Game.camera.x));
+  const panBox = await page.evaluate(() => {
+    const r = Game.canvas.getBoundingClientRect();
+    return { x: r.left + r.width * 0.6, y: r.top + r.height * 0.35 };
+  });
+  await page.mouse.move(panBox.x, panBox.y);
+  await page.mouse.down();
+  await page.mouse.move(panBox.x - 260, panBox.y, { steps: 12 });
+  await page.waitForTimeout(120);
+  const panDuring = await page.evaluate(() => ({ x: Math.round(Game.camera.x), manual: Game.camera.manual }));
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const panAfter = await page.evaluate(() => Math.round(Game.camera.x));
+
+  console.log('  камера: было ' + panStart + ', при перетаскивании ' + panDuring.x + ', после отпускания ' + panAfter);
+  check('камера отводится вправо', panDuring.x > panStart + 100, panStart + ' -> ' + panDuring.x);
+  check('камера не уезжает обратно сама', Math.abs(panAfter - panDuring.x) < 12, panDuring.x + ' -> ' + panAfter);
+  check('птица при этом не выстрелила', await page.evaluate(() => Game.state === 'ready'));
+
+  // А теперь тянем ЗА птицу: это должно быть прицеливание, а не камера
+  const aimStart = await page.evaluate(() => {
+    Game.loadLevel(3);
+    const r = Game.canvas.getBoundingClientRect();
+    return { x: (CONFIG.slingshot.x - Game.camera.x) * Game.camera.zoom + r.left,
+             y: (CONFIG.slingshot.y - Game.camera.y) * Game.camera.zoom + r.top };
+  });
+  await page.waitForTimeout(300);
+  const camBefore = await page.evaluate(() => Math.round(Game.camera.x));
+  await page.mouse.move(aimStart.x, aimStart.y);
+  await page.mouse.down();
+  await page.mouse.move(aimStart.x - 70, aimStart.y + 50, { steps: 8 });
+  await page.waitForTimeout(120);
+  const aiming = await page.evaluate(() => ({ aiming: Slingshot.aiming, cam: Math.round(Game.camera.x) }));
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  console.log('  натягивание за птицу: ' + JSON.stringify(aiming) + ', камера была ' + camBefore);
+  check('нажатие на птицу это прицеливание, а не камера', aiming.aiming === true);
+  check('при прицеливании камера стоит', Math.abs(aiming.cam - camBefore) < 12,
+        camBefore + ' -> ' + aiming.cam);
+
+  console.log('\n--- 7к. ЗАДУМКА НОВЫХ УРОВНЕЙ РАБОТАЕТ? ---');
+  /* Уровень может быть геометрически корректным и при этом бессмысленным.
+     Оба новых уровня построены вокруг одной мысли: выбей лёд, и тяжёлый
+     камень сам раздавит тех, до кого не достать выстрелом. Проверяем именно
+     это, а не то, что блоки стоят ровно. */
+  for (const [index, label] of [[3, 'Каменный навес'], [4, 'Ледник']]) {
+    const res = await page.evaluate(async (lvl) => {
+      Game.loadLevel(lvl);
+      const pigsBefore = Game.pigs.length;
+
+      // Выбиваем весь лёд, как будто по нему попали
+      const ice = Game.blocks.filter(b => b.material === 'ice');
+      for (const block of ice) Game.queueDestroy(block);
+
+      let killedAt = null;
+      for (let i = 0; i < 240; i++) {
+        Game.update(16.7);
+        if (killedAt === null && Game.pigs.length < pigsBefore) killedAt = Math.round(i * 16.7);
+      }
+      return {
+        level: Game.level.name,
+        iceBlocks: ice.length,
+        pigsBefore, pigsAfter: Game.pigs.length,
+        killedAt, score: Game.score,
+        // То, что игрок реально видит в панели
+        hudPigs: parseInt(document.getElementById('pigs-left').textContent, 10)
+      };
+    }, index);
+
+    console.log('  ' + res.level + ': выбито ледяных блоков ' + res.iceBlocks +
+                ', свиней ' + res.pigsBefore + ' -> ' + res.pigsAfter +
+                (res.killedAt !== null ? ', первая погибла через ' + res.killedAt + ' мс' : ''));
+    check('на уровне "' + label + '" обвал давит свиней',
+          res.pigsAfter < res.pigsBefore,
+          'осталось ' + res.pigsAfter + ' из ' + res.pigsBefore);
+    check('счётчик в панели совпадает с реальностью',
+          res.hudPigs === res.pigsAfter,
+          'в панели ' + res.hudPigs + ', на самом деле ' + res.pigsAfter);
+  }
 
   console.log('\n--- 8. СКРИНШОТЫ ---');
   await page.evaluate(() => Game.loadLevel(0));
