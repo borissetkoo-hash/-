@@ -155,7 +155,7 @@ function moveAll(out, dx) {
 
    Побочный эффект приятный: теперь видно разницу между слабым и сильным
    натяжением. При близкой цели почти любой выстрел долетал. */
-const FORT_OFFSET = 180;
+const FORT_OFFSET = 40;
 
 /* =============================================================================
    УРОВЕНЬ 1 — ДЕРЕВЯННАЯ ЗАСТАВА
@@ -190,9 +190,9 @@ function level1() {
   putBox(out, 1390, s6, 36, 'tnt');
 
   // --- Ледяной сарай справа ---
-  const i1 = putColumns(out, [1650, 1760], GY, 100, 'ice');
-  const i2 = putBeam(out, 1705, i1, 140, 'ice');
-  putPig(out, 1705, i2, 18);
+  const i1 = putColumns(out, [1625, 1725], GY, 100, 'ice');
+  const i2 = putBeam(out, 1675, i1, 140, 'ice');
+  putPig(out, 1675, i2, 18);
 
   moveAll(out, FORT_OFFSET);
 
@@ -346,7 +346,7 @@ function level4() {
   putBox(out, 1580, roofTop, 36, 'tnt');
 
   // --- Одна свинья снаружи, ВНИЗУ под обрывом: её достать проще всего ---
-  putPig(out, 1820, GY, 18);
+  putPig(out, 1720, GY, 18);
 
   moveAll(out, FORT_OFFSET);
 

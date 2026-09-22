@@ -151,7 +151,14 @@ function check(name, ok, extra) {
   // траектория падает примерно в середину крепости. Так тест не сломается,
   // если потом поменять силу рогатки или расстояние до построек.
   const pts = await page.evaluate(() => {
-    const TARGET = 1300;
+    /* Куда целиться. Было жёстко 1300, и после переноса крепостей ближе эта
+       точка оказалась уже ВНУТРИ постройки: тест бил в середину конструкции
+       и мерил совсем не то, что раньше. Третий случай одной и той же ошибки
+       за сегодня, поэтому и здесь число берётся у уровня. */
+    let fortLeft = Infinity;
+    for (const bl of Game.level.blocks) fortLeft = Math.min(fortLeft, bl.x - bl.w / 2);
+    const TARGET = Math.round(fortLeft + 130);
+
     const sx = CONFIG.slingshot.x, sy = CONFIG.slingshot.y;
     const power = CONFIG.slingshot.power * CONFIG.birds.red.power;
     let best = null;
@@ -160,7 +167,19 @@ function check(name, ok, extra) {
         if (Math.hypot(dx, dy) > CONFIG.slingshot.maxPull) continue;
         const px = sx + dx, py = sy + dy;
         const v = { x: (sx - px) * power, y: (sy - py) * power };
-        const path = Physics.predictTrajectory(px, py, v.x, v.y, 300, 0.006);
+        /* Трение берём у САМОЙ ПТИЦЫ, а не числом.
+
+           Здесь было зашито 0.006 — значение, которое игра использовала когда-то
+           давно. Потом трение стало настройкой и уехало до 0.0016, а тут
+           осталось старое. Перебор планировал полёт по физике, которой в игре
+           уже нет: выбирал плоский сильный выстрел, считая, что воздух его
+           затормозит, а на деле птица улетала на двести пикселей дальше.
+
+           Четвёртый случай за сегодня, когда продублированное число разошлось
+           с оригиналом. Правило простое: не копируй значение, спрашивай его у
+           того, кто им пользуется. */
+        const drag = Slingshot.bird ? Slingshot.bird.body.frictionAir : CONFIG.world.airFriction;
+        const path = Physics.predictTrajectory(px, py, v.x, v.y, 300, drag);
         const last = path[path.length - 1];
         if (!last) continue;
         const err = Math.abs(last.x - TARGET);
@@ -172,6 +191,7 @@ function check(name, ok, extra) {
       x: (wx - Game.camera.x) * Game.camera.zoom + r.left,
       y: (wy - Game.camera.y) * Game.camera.zoom + r.top
     });
+    best.target = TARGET;
     return {
       anchor: toScreen(sx, sy),
       pull:   toScreen(sx + best.dx, sy + best.dy),
@@ -204,7 +224,8 @@ function check(name, ok, extra) {
   check('режим прицеливания включился', aim.aiming === true);
   check('траектория посчитана', aim.traj > 10, aim.traj + ' точек');
   check('скорость направлена вправо-вверх', aim.v.x > 0 && aim.v.y < 0);
-  check('траектория попадает в крепость', aim.lastPoint && aim.lastPoint.x > 1100 && aim.lastPoint.x < 1600,
+  check('траектория попадает в крепость',
+        aim.lastPoint && Math.abs(aim.lastPoint.x - pts.best.target) < 60,
         'конец пунктира x=' + (aim.lastPoint ? Math.round(aim.lastPoint.x) : '?'));
 
   console.log('\n--- 4. ВЫСТРЕЛ ---');
@@ -457,9 +478,19 @@ function check(name, ok, extra) {
     bird.launched = true;
     Slingshot.bird = null; Game.activeBird = bird; Game.state = 'flying';
 
-    // Летим до крепости, затем роняем яйцо
+    /* Летим до крепости, затем роняем яйцо.
+
+       Здесь стояло жёсткое число 1150, и проверка сломалась, как только
+       крепости подвинули ближе: птица роняла яйцо, не долетев до построек, и
+       тест честно сообщал «взрыв не нанёс урона». Координату надо брать у
+       уровня, а не помнить наизусть — ровно тот же урок, что и с числом
+       уровней. */
+    let fortX = Infinity;
+    for (const bl of Game.level.blocks) fortX = Math.min(fortX, bl.x - bl.w / 2);
+    const dropAt = fortX + 70;
+
     let steps = 0;
-    while (steps < 200 && bird.x < 1150) { Physics.step(16.7); steps++; }
+    while (steps < 200 && bird.x < dropAt) { Physics.step(16.7); steps++; }
     const ability = bird.useAbility();
     Game.activeBird = bird;
     bird.abilityUsed = false;           // чтобы triggerAbility отработал целиком
