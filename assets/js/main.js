@@ -208,12 +208,44 @@
   /* ---------- Плеер шоурила ---------- */
   const player = $('.player');
   if (player) {
-    const open = () => { player.classList.add('open'); const v = $('video', player); if (v) v.play().catch(() => {}); };
-    const close = () => { player.classList.remove('open'); const v = $('video', player); if (v) v.pause(); };
+    const frame = $('iframe', player);
+    const open = () => {
+      player.classList.add('open');
+      if (frame && frame.dataset.src) frame.src = frame.dataset.src;
+      const v = $('video', player); if (v) v.play().catch(() => {});
+    };
+    const close = () => {
+      player.classList.remove('open');
+      if (frame && frame.dataset.src) frame.src = 'about:blank';
+      const v = $('video', player); if (v) v.pause();
+    };
     $$('[data-open-player]').forEach((b) => b.addEventListener('click', open));
     $('.close', player).addEventListener('click', close);
     player.addEventListener('click', (e) => { if (e.target === player) close(); });
     addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  }
+
+  /* ---------- Первый экран: слайдер проектов ---------- */
+  const bgs = $$('.hs-bg'), infos = $$('.slide-info'), dotBtns = $$('.dots button'), cnt = $('.counter .mono-big');
+  if (bgs.length > 1) {
+    let cur = 0, timer;
+    const go = (i) => {
+      cur = (i + bgs.length) % bgs.length;
+      [bgs, infos, dotBtns].forEach((list) => list.forEach((el, k) => el.classList.toggle('on', k === cur)));
+      cnt.textContent = String(cur + 1).padStart(2, '0');
+    };
+    const auto = () => { clearInterval(timer); if (!reduced) timer = setInterval(() => go(cur + 1), 5500); };
+    dotBtns.forEach((b, k) => b.addEventListener('click', () => { go(k); auto(); }));
+    let sx = null;
+    const card = $('.hero-card');
+    card.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    card.addEventListener('touchend', (e) => {
+      if (sx === null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 50) { go(cur + (dx < 0 ? 1 : -1)); auto(); }
+      sx = null;
+    });
+    auto();
   }
 
   /* ---------- Список мест: кадр летит за курсором ---------- */
