@@ -3,186 +3,303 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Анна Сетко</title>
-  <meta name="description" content="Личный сайт Анны Сетко">
+  <title>Анечка Сетко</title>
+  <meta name="description" content="Анечка Сетко — видеограф и AI-креатор. Оренбург / Москва. Снимаю так, что хочется пересмотреть.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;700&family=Playfair+Display:ital@1&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
+    /* Палитра взята из ленты @esh_setko: ночные кадры, песок, солома, бассейн и спритц */
     :root {
-      --bg: #f6f1ea;
-      --surface: #efe7dc;
-      --ink: #1f1b17;
-      --muted: #7a6f64;
-      --line: #d9cfc2;
-      --accent: #a8644a;
-      --serif: "Cormorant Garamond", Georgia, serif;
+      --night: #1e1b18;
+      --night-2: #2a2622;
+      --umber: #35302a;
+      --sand: #f4eee4;
+      --text: #ede6da;
+      --muted: #a39a8c;
+      --straw: #b08a63;
+      --tan: #907056;
+      --olive: #636056;
+      --sage: #687470;
+      --spritz: #f28c28;
+      --pool: #1fa6c9;
+      --line: rgba(237, 230, 218, .12);
+      --display: "Unbounded", system-ui, sans-serif;
+      --accent-serif: "Playfair Display", Georgia, serif;
       --sans: "Inter", system-ui, sans-serif;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --bg: #16130f; --surface: #1f1b16; --ink: #efe7dc;
-        --muted: #a39686; --line: #3a332b; --accent: #d08a6c;
-      }
-    }
-    :root[data-theme="dark"] {
-      --bg: #16130f; --surface: #1f1b16; --ink: #efe7dc;
-      --muted: #a39686; --line: #3a332b; --accent: #d08a6c;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      background: var(--bg); color: var(--ink);
+      background: var(--night); color: var(--text);
       font: 300 17px/1.7 var(--sans);
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
     a { color: inherit; text-decoration: none; }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-    .placeholder { color: var(--accent); }
+    em { font-family: var(--accent-serif); font-style: italic; font-weight: 400; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .placeholder { outline: 1px dashed rgba(242, 140, 40, .45); outline-offset: 4px; }
+
+    /* Плёночное зерно поверх всего сайта */
+    body::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .07;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
 
     /* Навигация */
     header {
-      position: sticky; top: 0; z-index: 10;
-      background: color-mix(in srgb, var(--bg) 85%, transparent);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--line);
+      position: fixed; inset: 0 0 auto; z-index: 20;
+      transition: background .3s, border-color .3s;
+      border-bottom: 1px solid transparent;
     }
-    nav { display: flex; justify-content: space-between; align-items: center; height: 64px; }
-    .logo { font: 500 22px var(--serif); letter-spacing: .02em; }
-    nav ul { display: flex; gap: 28px; list-style: none; font-size: 14px; }
+    header.scrolled { background: rgba(30, 27, 24, .82); backdrop-filter: blur(12px); border-color: var(--line); }
+    nav { display: flex; justify-content: space-between; align-items: center; height: 72px; }
+    .logo { font: 500 15px var(--display); letter-spacing: .08em; }
+    .logo span { color: var(--spritz); }
+    nav ul { display: flex; gap: 32px; list-style: none; font-size: 14px; }
     nav ul a { color: var(--muted); transition: color .2s; }
-    nav ul a:hover { color: var(--ink); }
+    nav ul a:hover { color: var(--text); }
 
-    /* Первый экран */
+    /* Первый экран: сюда встанет шоурил */
     .hero {
-      min-height: calc(100vh - 64px);
-      display: grid; grid-template-columns: 1.2fr 1fr; gap: 64px; align-items: center;
-      padding: 64px 0;
+      position: relative; min-height: 100vh; display: flex; align-items: flex-end;
+      padding: 140px 0 72px; overflow: hidden;
     }
-    .eyebrow { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+    .hero-media {
+      position: absolute; inset: 0; z-index: -1;
+      background:
+        radial-gradient(ellipse 60% 45% at 72% 62%, rgba(242, 140, 40, .55), transparent 70%),
+        radial-gradient(ellipse 80% 40% at 50% 100%, rgba(31, 166, 201, .25), transparent 70%),
+        linear-gradient(180deg, #2a2622 0%, #5f5744 45%, #907056 70%, #35302a 100%);
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    .hero-media::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(30, 27, 24, .35) 0%, rgba(30, 27, 24, .1) 40%, var(--night) 100%);
+    }
+    .hero-media video { width: 100%; height: 100%; object-fit: cover; }
+    @keyframes drift { to { transform: scale(1.08) translateY(-2%); } }
+
+    .eyebrow { font: 500 12px var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+    .hero .eyebrow { color: var(--sand); }
     .hero h1 {
-      font: 400 clamp(56px, 9vw, 120px)/0.95 var(--serif);
-      margin: 20px 0 28px; letter-spacing: -.01em;
+      font: 700 clamp(44px, 9vw, 132px)/0.95 var(--display);
+      letter-spacing: -.03em; margin: 24px 0 28px; text-transform: uppercase;
     }
-    .hero h1 em { color: var(--accent); }
-    .hero p { max-width: 460px; color: var(--muted); }
-    .btn {
-      display: inline-block; margin-top: 36px; padding: 14px 32px;
-      border: 1px solid var(--ink); border-radius: 999px; font-size: 14px;
-      transition: background .25s, color .25s;
+    .hero h1 em { text-transform: none; color: var(--spritz); letter-spacing: -.01em; }
+    .hero-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; flex-wrap: wrap; }
+    .hero-bottom p { max-width: 420px; color: var(--sand); opacity: .85; }
+    .play {
+      display: inline-flex; align-items: center; gap: 16px;
+      font: 500 13px var(--display); letter-spacing: .12em; text-transform: uppercase;
     }
-    .btn:hover { background: var(--ink); color: var(--bg); }
-    .portrait {
-      aspect-ratio: 4 / 5; border-radius: 240px 240px 8px 8px;
-      background: linear-gradient(160deg, var(--surface), var(--line));
-      display: grid; place-items: center; color: var(--muted);
-      font: italic 20px var(--serif);
+    .play i {
+      width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+      border: 1px solid var(--sand); font-style: normal; transition: background .3s, color .3s;
     }
+    .play:hover i { background: var(--spritz); border-color: var(--spritz); color: var(--night); }
+
+    /* Бегущая строка с темами хайлайтов */
+    .marquee { border-block: 1px solid var(--line); overflow: hidden; white-space: nowrap; padding: 22px 0; }
+    .marquee div { display: inline-block; animation: scroll 30s linear infinite; font: 300 clamp(22px, 3vw, 34px) var(--display); }
+    .marquee span { margin: 0 28px; }
+    .marquee b { color: var(--spritz); font-weight: 300; }
+    @keyframes scroll { to { transform: translateX(-50%); } }
 
     /* Секции */
-    section { padding: 120px 0; border-top: 1px solid var(--line); }
-    .section-head { display: grid; grid-template-columns: 200px 1fr; gap: 48px; margin-bottom: 64px; }
-    .num { font: italic 20px var(--serif); color: var(--accent); }
-    h2 { font: 400 clamp(36px, 5vw, 56px)/1.1 var(--serif); }
+    section { padding: 140px 0; }
+    .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; margin-bottom: 64px; flex-wrap: wrap; }
+    h2 { font: 500 clamp(34px, 5vw, 64px)/1.05 var(--display); letter-spacing: -.02em; margin-top: 16px; }
+    h2 em { color: var(--straw); }
 
-    .about { display: grid; grid-template-columns: 200px 1fr; gap: 48px; }
-    .about .text { font: 400 clamp(22px, 2.6vw, 30px)/1.5 var(--serif); max-width: 760px; }
-    .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px; }
-    .facts b { display: block; font: 400 44px var(--serif); }
-    .facts span { font-size: 14px; color: var(--muted); }
-
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
-    .card { background: var(--bg); padding: 40px 32px; transition: background .3s; }
-    .card:hover { background: var(--surface); }
-    .card .i { font: italic 18px var(--serif); color: var(--accent); }
-    .card h3 { font: 400 28px var(--serif); margin: 16px 0 12px; }
-    .card p { font-size: 15px; color: var(--muted); }
-
-    .works { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; }
-    .work .img {
-      aspect-ratio: 4 / 3; background: var(--surface); border-radius: 6px;
-      display: grid; place-items: center; color: var(--muted); font: italic 18px var(--serif);
-      transition: transform .5s;
+    /* Обо мне */
+    .about { display: grid; grid-template-columns: 5fr 7fr; gap: 72px; align-items: center; }
+    .about-photo {
+      aspect-ratio: 3 / 4; border-radius: 4px; position: relative; overflow: hidden;
+      background: linear-gradient(200deg, var(--olive), var(--umber) 60%, var(--night-2));
+      display: grid; place-items: end start; padding: 24px; color: var(--muted); font-size: 13px;
     }
-    .work:hover .img { transform: scale(.98); }
-    .work .meta { display: flex; justify-content: space-between; margin-top: 16px; }
-    .work h3 { font: 400 24px var(--serif); }
-    .work .year { color: var(--muted); font-size: 14px; }
-
-    .timeline { list-style: none; }
-    .timeline li {
-      display: grid; grid-template-columns: 200px 1fr; gap: 48px;
-      padding: 28px 0; border-bottom: 1px solid var(--line);
+    .about-photo::before {
+      content: ""; position: absolute; width: 70%; aspect-ratio: 1; border-radius: 50%;
+      right: -20%; top: -10%; background: radial-gradient(circle, rgba(242, 140, 40, .5), transparent 70%);
     }
-    .timeline .y { color: var(--muted); font-size: 14px; }
-    .timeline h3 { font: 400 24px var(--serif); }
-    .timeline p { color: var(--muted); font-size: 15px; }
+    .lead { font: 300 clamp(22px, 2.6vw, 32px)/1.45 var(--display); letter-spacing: -.01em; }
+    .lead em { color: var(--spritz); }
+    .about p.body { margin-top: 28px; color: var(--muted); max-width: 560px; }
+    .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+    .facts b { display: block; font: 500 clamp(28px, 3.4vw, 40px) var(--display); }
+    .facts span { font-size: 13px; color: var(--muted); }
 
-    .quote { text-align: center; }
-    .quote blockquote { font: italic 400 clamp(30px, 4.5vw, 52px)/1.3 var(--serif); max-width: 860px; margin: 0 auto; }
+    /* Услуги: VIDEO × AI */
+    .services { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .service {
+      position: relative; padding: 48px 40px 40px; border: 1px solid var(--line); border-radius: 4px;
+      min-height: 420px; display: flex; flex-direction: column; justify-content: space-between;
+      overflow: hidden; transition: border-color .4s;
+    }
+    .service::before {
+      content: ""; position: absolute; inset: auto -30% -60% auto; width: 80%; aspect-ratio: 1; border-radius: 50%;
+      opacity: .0; transition: opacity .6s;
+    }
+    .service.video::before { background: radial-gradient(circle, rgba(242, 140, 40, .35), transparent 70%); }
+    .service.ai::before { background: radial-gradient(circle, rgba(31, 166, 201, .35), transparent 70%); }
+    .service:hover { border-color: rgba(237, 230, 218, .3); }
+    .service:hover::before { opacity: 1; }
+    .service .tag { font: 700 clamp(56px, 8vw, 104px)/1 var(--display); letter-spacing: -.04em; }
+    .service.video .tag { color: var(--spritz); }
+    .service.ai .tag { color: var(--pool); }
+    .service h3 { font: 500 22px var(--display); margin-bottom: 14px; }
+    .service ul { list-style: none; color: var(--muted); font-size: 15px; }
+    .service li { padding: 8px 0; border-top: 1px solid var(--line); }
 
-    .contact { text-align: center; }
-    .contact h2 { font-size: clamp(48px, 8vw, 96px); }
-    .contact a.mail { display: inline-block; margin-top: 24px; font: italic 28px var(--serif); border-bottom: 1px solid var(--accent); }
-    .socials { display: flex; justify-content: center; gap: 32px; margin-top: 40px; font-size: 14px; color: var(--muted); }
-    .socials a:hover { color: var(--ink); }
+    /* Работы */
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filters button {
+      background: none; border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+      padding: 10px 18px; border-radius: 999px; font: 400 13px var(--sans); transition: all .2s;
+    }
+    .filters button:hover { color: var(--text); border-color: var(--muted); }
+    .filters button.active { background: var(--text); color: var(--night); border-color: var(--text); }
 
-    footer { padding: 32px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
-    footer .wrap { display: flex; justify-content: space-between; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .work { position: relative; aspect-ratio: 9 / 16; border-radius: 4px; overflow: hidden; cursor: pointer; }
+    .work.wide { grid-column: span 2; aspect-ratio: 9 / 8; }
+    .work.hide { display: none; }
+    .work .media { position: absolute; inset: 0; transition: transform .8s cubic-bezier(.2, .7, .2, 1); }
+    .work:hover .media { transform: scale(1.06); }
+    .work .info {
+      position: absolute; inset: auto 0 0; padding: 20px;
+      background: linear-gradient(transparent, rgba(30, 27, 24, .9));
+    }
+    .work .cat { font: 500 10px var(--display); letter-spacing: .2em; text-transform: uppercase; color: var(--sand); opacity: .7; }
+    .work h3 { font: 500 16px/1.3 var(--display); margin-top: 6px; }
+    .work .reel {
+      position: absolute; top: 16px; right: 16px; font-size: 11px; letter-spacing: .1em;
+      padding: 4px 10px; border-radius: 999px; background: rgba(30, 27, 24, .55); backdrop-filter: blur(6px);
+    }
+    /* Временные «кадры» из цветов ленты, пока нет настоящих фото и видео */
+    .m-sunset { background: linear-gradient(180deg, #5f5744, #907056 50%, #f28c28 78%, #35302a); }
+    .m-pool   { background: radial-gradient(ellipse at 50% 80%, #1fa6c9, #1e1b18 70%); }
+    .m-straw  { background: repeating-linear-gradient(100deg, #b08a63 0 6px, #907056 6px 12px), #907056; }
+    .m-mango  { background: radial-gradient(circle at 50% 55%, #f28c28 0 22%, #f4eee4 23% 40%, #9a9c8e 41%); }
+    .m-ai     { background: radial-gradient(ellipse at 50% 40%, #687470, #2a2622 65%), #1e1b18; }
+    .m-car    { background: radial-gradient(circle at 70% 70%, rgba(31, 166, 201, .7), transparent 25%), linear-gradient(160deg, #434442, #1e1b18); }
+    .m-city   { background: linear-gradient(180deg, #9a9c8e, #636056 55%, #5d5248); }
+    .m-spritz { background: radial-gradient(circle at 40% 45%, #f28c28 0 18%, transparent 19%), radial-gradient(circle at 62% 55%, #f28c28cc 0 16%, transparent 17%), linear-gradient(180deg, #7a6a54, #35302a); }
+    .m-brazil { background: linear-gradient(170deg, #1fa6c9 0%, #687470 45%, #636056 70%, #35302a); }
+    .m-dress  { background: linear-gradient(180deg, #1e1b18, #35302a 50%, #7a6a54); }
+
+    /* Почерк */
+    .style-list { list-style: none; counter-reset: s; }
+    .style-list li {
+      counter-increment: s; display: grid; grid-template-columns: 80px 1fr 1fr; gap: 32px; align-items: baseline;
+      padding: 32px 0; border-top: 1px solid var(--line); transition: padding .3s;
+    }
+    .style-list li:last-child { border-bottom: 1px solid var(--line); }
+    .style-list li::before { content: "0" counter(s); font: 500 13px var(--display); color: var(--spritz); }
+    .style-list li:hover { padding-left: 12px; }
+    .style-list h3 { font: 500 clamp(20px, 2.4vw, 28px) var(--display); }
+    .style-list p { color: var(--muted); font-size: 15px; }
+
+    /* Цитата */
+    .quote { text-align: center; padding: 160px 0; }
+    .quote blockquote { font: 300 clamp(30px, 5vw, 64px)/1.2 var(--display); letter-spacing: -.02em; max-width: 1000px; margin: 0 auto; }
+    .quote blockquote em { color: var(--spritz); }
+    .quote cite { display: block; margin-top: 32px; font-style: normal; color: var(--muted); font-size: 14px; }
+
+    /* Контакты */
+    .contact { background: var(--sand); color: var(--night); border-radius: 4px; padding: 96px 64px; text-align: center; }
+    .contact .eyebrow { color: var(--tan); }
+    .contact h2 { font-size: clamp(36px, 6vw, 80px); }
+    .contact h2 em { color: var(--tan); }
+    .contact p { margin: 20px auto 0; max-width: 480px; color: #5d5248; }
+    .btns { display: flex; justify-content: center; gap: 12px; margin-top: 40px; flex-wrap: wrap; }
+    .btn {
+      padding: 16px 32px; border-radius: 999px; font: 500 13px var(--display); letter-spacing: .06em;
+      border: 1px solid var(--night); transition: background .25s, color .25s;
+    }
+    .btn.primary { background: var(--night); color: var(--sand); }
+    .btn:hover { background: var(--spritz); border-color: var(--spritz); color: var(--night); }
+
+    footer { padding: 40px 0; font-size: 13px; color: var(--muted); }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
     /* Появление при скролле */
-    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .9s ease, transform .9s ease; }
+    .reveal { opacity: 0; transform: translateY(32px); transition: opacity 1s ease, transform 1s ease; }
     .reveal.in { opacity: 1; transform: none; }
-    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .hero-media, .marquee div { animation: none; }
+    }
 
-    @media (max-width: 820px) {
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .about, .services { grid-template-columns: 1fr; gap: 40px; }
+      .about-photo { max-width: 420px; }
+      .style-list li { grid-template-columns: 48px 1fr; }
+      .style-list p { grid-column: 2; }
+    }
+    @media (max-width: 640px) {
       body { font-size: 16px; }
       .wrap { padding: 0 16px; }
       nav ul { display: none; }
-      .hero { grid-template-columns: 1fr; gap: 40px; min-height: auto; }
-      .portrait { max-width: 360px; width: 100%; }
-      section { padding: 80px 0; }
-      .section-head, .about, .timeline li { grid-template-columns: 1fr; gap: 12px; }
-      .cards, .works, .facts { grid-template-columns: 1fr; }
-      footer .wrap { flex-direction: column; gap: 8px; }
+      section { padding: 96px 0; }
+      .service { padding: 36px 24px 28px; min-height: 340px; }
+      .work.wide { grid-column: span 2; aspect-ratio: 16 / 10; }
+      .facts { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+      .contact { padding: 64px 20px; }
     }
   </style>
 </head>
 <body>
-  <header>
+  <header id="header">
     <nav class="wrap">
-      <a href="#top" class="logo">А. Сетко</a>
+      <a href="#top" class="logo">ESH<span>•</span>SETKO</a>
       <ul>
         <li><a href="#about">Обо мне</a></li>
-        <li><a href="#services">Чем занимаюсь</a></li>
-        <li><a href="#works">Проекты</a></li>
-        <li><a href="#path">Путь</a></li>
+        <li><a href="#services">Услуги</a></li>
+        <li><a href="#works">Работы</a></li>
+        <li><a href="#style">Почерк</a></li>
         <li><a href="#contact">Контакты</a></li>
       </ul>
     </nav>
   </header>
 
   <main id="top">
-    <div class="wrap hero">
-      <div class="reveal">
-        <div class="eyebrow placeholder">[Профессия] · [Город]</div>
-        <h1>Анна<br><em>Сетко</em></h1>
-        <p class="placeholder">[Одна-две фразы о том, кто вы и что делаете. Например: «Создаю … для … ».]</p>
-        <a href="#contact" class="btn">Связаться</a>
+    <div class="hero">
+      <!-- Заменить на шоурил: <video src="showreel.mp4" autoplay muted loop playsinline></video> -->
+      <div class="hero-media"></div>
+      <div class="wrap">
+        <div class="eyebrow">Video × AI creator · ORB / MSC 📍</div>
+        <h1>Снимаю так,<br>что хочется <em>пересмотреть</em></h1>
+        <div class="hero-bottom">
+          <p>Анечка Сетко, она же Эстер-Ханна 🪬 Видеограф и AI-креатор. Вижу мир и показываю его вам.</p>
+          <a href="#works" class="play placeholder"><i>▶</i>Смотреть шоурил</a>
+        </div>
       </div>
-      <div class="portrait reveal">фото</div>
+    </div>
+
+    <div class="marquee" aria-hidden="true">
+      <div>
+        <span>Travel</span><b>✦</b><span>AI</span><b>✦</b><span>Lifestyle</span><b>✦</b><span>Egypt</span><b>✦</b><span>Brazil</span><b>✦</b><span>Car</span><b>✦</b><span>Dosug</span><b>✦</b>
+        <span>Travel</span><b>✦</b><span>AI</span><b>✦</b><span>Lifestyle</span><b>✦</b><span>Egypt</span><b>✦</b><span>Brazil</span><b>✦</b><span>Car</span><b>✦</b><span>Dosug</span><b>✦</b>
+      </div>
     </div>
 
     <section id="about">
-      <div class="wrap about reveal">
-        <div class="num">01 — Обо мне</div>
-        <div>
-          <p class="text placeholder">[Короткий рассказ: чем вы живёте, что вдохновляет, какой подход в работе. 3–4 предложения, от первого лица.]</p>
+      <div class="wrap about">
+        <div class="about-photo reveal placeholder">портрет · фото из хайлайта ME🤍</div>
+        <div class="reveal">
+          <div class="eyebrow">01 — Обо мне</div>
+          <h2>Привет, я <em>Анечка</em></h2>
+          <p class="lead" style="margin-top:28px">Можно по-еврейски Эстер-Ханна. Создаю <em>кошерный</em> контент 🤑</p>
+          <p class="body placeholder">Снимаю путешествия, лайфстайл и детали, мимо которых обычно проходят: золотой час, ночную подсветку бассейна, манго крупным планом. А ещё делаю AI-контент. Работаю между Оренбургом и Москвой, а снимать готова где угодно: от Египта до Бразилии.</p>
           <div class="facts">
-            <div><b class="placeholder">[N]</b><span>лет опыта</span></div>
-            <div><b class="placeholder">[N]</b><span>проектов</span></div>
-            <div><b class="placeholder">[N]</b><span>довольных клиентов</span></div>
+            <div><b>3K+</b><span>подписчиков в Instagram</span></div>
+            <div><b>2</b><span>города: Оренбург и Москва</span></div>
+            <div><b>2</b><span>направления: видео и AI</span></div>
           </div>
         </div>
       </div>
@@ -190,65 +307,123 @@
 
     <section id="services">
       <div class="wrap">
-        <div class="section-head reveal"><div class="num">02</div><h2>Чем занимаюсь</h2></div>
-        <div class="cards reveal">
-          <div class="card"><div class="i">i.</div><h3 class="placeholder">[Направление 1]</h3><p class="placeholder">[Короткое описание]</p></div>
-          <div class="card"><div class="i">ii.</div><h3 class="placeholder">[Направление 2]</h3><p class="placeholder">[Короткое описание]</p></div>
-          <div class="card"><div class="i">iii.</div><h3 class="placeholder">[Направление 3]</h3><p class="placeholder">[Короткое описание]</p></div>
+        <div class="head reveal">
+          <div><div class="eyebrow">02 — Услуги</div><h2>Video <em>×</em> AI</h2></div>
+        </div>
+        <div class="services">
+          <div class="service video reveal">
+            <div class="tag">VIDEO</div>
+            <div>
+              <h3>Видеосъёмка</h3>
+              <ul class="placeholder">
+                <li>Рилсы и короткие вертикальные видео</li>
+                <li>Travel и lifestyle-съёмка</li>
+                <li>Личные и fashion-портреты</li>
+                <li>Предметка и макро-детали</li>
+              </ul>
+            </div>
+          </div>
+          <div class="service ai reveal">
+            <div class="tag">AI</div>
+            <div>
+              <h3>AI-контент</h3>
+              <ul class="placeholder">
+                <li>AI-портреты и аватары</li>
+                <li>Генерация визуала для соцсетей</li>
+                <li>AI-видео и анимация кадров</li>
+                <li>Смешанный контент: съёмка + AI</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section id="works">
       <div class="wrap">
-        <div class="section-head reveal"><div class="num">03</div><h2>Избранные проекты</h2></div>
-        <div class="works">
-          <a class="work reveal" href="#"><div class="img">изображение</div><div class="meta"><h3 class="placeholder">[Проект]</h3><span class="year">20XX</span></div></a>
-          <a class="work reveal" href="#"><div class="img">изображение</div><div class="meta"><h3 class="placeholder">[Проект]</h3><span class="year">20XX</span></div></a>
-          <a class="work reveal" href="#"><div class="img">изображение</div><div class="meta"><h3 class="placeholder">[Проект]</h3><span class="year">20XX</span></div></a>
-          <a class="work reveal" href="#"><div class="img">изображение</div><div class="meta"><h3 class="placeholder">[Проект]</h3><span class="year">20XX</span></div></a>
+        <div class="head reveal">
+          <div><div class="eyebrow">03 — Работы</div><h2>Избранное</h2></div>
+          <div class="filters" role="group" aria-label="Фильтр работ">
+            <button class="active" data-f="all">Все</button>
+            <button data-f="travel">Travel</button>
+            <button data-f="lifestyle">Lifestyle</button>
+            <button data-f="ai">AI</button>
+            <button data-f="car">Car</button>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="work wide reveal" data-c="travel"><div class="media m-sunset"></div><span class="reel">▶ reel</span><div class="info"><div class="cat">Egypt 🇪🇬</div><h3>Закат и ткань на ветру</h3></div></div>
+          <div class="work reveal" data-c="lifestyle"><div class="media m-pool"></div><span class="reel">▶ reel</span><div class="info"><div class="cat">Lifestyle</div><h3>Ночь у бассейна</h3></div></div>
+          <div class="work reveal" data-c="travel"><div class="media m-straw"></div><div class="info"><div class="cat">Egypt 🇪🇬</div><h3>Небо сквозь соломенный зонт</h3></div></div>
+          <div class="work reveal" data-c="ai"><div class="media m-ai"></div><div class="info"><div class="cat">AI 👾</div><h3>AI-портрет</h3></div></div>
+          <div class="work reveal" data-c="car"><div class="media m-car"></div><span class="reel">▶ reel</span><div class="info"><div class="cat">Car 🏁</div><h3>Брелок на мокром асфальте</h3></div></div>
+          <div class="work reveal" data-c="lifestyle"><div class="media m-mango"></div><div class="info"><div class="cat">Details</div><h3>Манго крупным планом</h3></div></div>
+          <div class="work reveal" data-c="lifestyle"><div class="media m-dress"></div><div class="info"><div class="cat">Lifestyle</div><h3>Вечерний образ</h3></div></div>
+          <div class="work wide reveal" data-c="travel"><div class="media m-city"></div><div class="info"><div class="cat">City</div><h3>Парки и балюстрады</h3></div></div>
+          <div class="work reveal" data-c="lifestyle"><div class="media m-spritz"></div><div class="info"><div class="cat">Dosug</div><h3>Спритц и веер</h3></div></div>
+          <div class="work reveal" data-c="travel"><div class="media m-brazil"></div><span class="reel">▶ reel</span><div class="info"><div class="cat">Brazil 🇧🇷</div><h3>Океан и зелень</h3></div></div>
         </div>
       </div>
     </section>
 
-    <section id="path">
+    <section id="style">
       <div class="wrap">
-        <div class="section-head reveal"><div class="num">04</div><h2>Путь</h2></div>
-        <ul class="timeline reveal">
-          <li><div class="y">20XX — сейчас</div><div><h3 class="placeholder">[Должность / проект]</h3><p class="placeholder">[Где и что делаете]</p></div></li>
-          <li><div class="y">20XX — 20XX</div><div><h3 class="placeholder">[Должность / проект]</h3><p class="placeholder">[Где и что делали]</p></div></li>
-          <li><div class="y">20XX</div><div><h3 class="placeholder">[Образование]</h3><p class="placeholder">[Учебное заведение, специальность]</p></div></li>
+        <div class="head reveal"><div><div class="eyebrow">04 — Почерк</div><h2>Как я <em>вижу</em></h2></div></div>
+        <ul class="style-list reveal">
+          <li><h3>Снизу вверх</h3><p>Небо сквозь соломенный навес, люди и архитектура в полный рост.</p></li>
+          <li><h3>POV</h3><p>Кадр от первого лица, будто зритель сам там стоит.</p></li>
+          <li><h3>Макро</h3><p>Фрукты, бокалы, брелок: детали, которые делают атмосферу.</p></li>
+          <li><h3>Ночь и неон</h3><p>Бирюзовая вода, тёплые огни отеля, контрастная подсветка.</p></li>
+          <li><h3>Золотой час</h3><p>Силуэты против солнца, блики, горизонт и много воздуха.</p></li>
         </ul>
       </div>
     </section>
 
     <section class="quote">
       <div class="wrap reveal">
-        <blockquote class="placeholder">«[Любимая цитата или личный девиз]»</blockquote>
+        <blockquote>Вижу мир — и <em>показываю</em> его вам</blockquote>
+        <cite>— @esh_setko</cite>
       </div>
     </section>
 
-    <section id="contact" class="contact">
-      <div class="wrap reveal">
-        <div class="eyebrow">05 — Контакты</div>
-        <h2>Давайте<br><em>поговорим</em></h2>
-        <a class="mail placeholder" href="#">[email@example.com]</a>
-        <div class="socials">
-          <a href="#">Telegram</a><a href="#">Instagram</a><a href="#">LinkedIn</a>
+    <section id="contact" style="padding-top:0">
+      <div class="wrap">
+        <div class="contact reveal">
+          <div class="eyebrow">05 — Контакты</div>
+          <h2>Снимем что-нибудь <em>кошерное?</em></h2>
+          <p>Пишите в директ или Threads, обсудим идею, локацию и формат. Оренбург, Москва и выезды.</p>
+          <div class="btns">
+            <a class="btn primary" href="https://www.instagram.com/esh_setko/" target="_blank" rel="noopener">Instagram</a>
+            <a class="btn" href="https://www.threads.net/@esh_setko" target="_blank" rel="noopener">Threads</a>
+            <a class="btn placeholder" href="#">Telegram</a>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="wrap"><span>© 2026 Анна Сетко</span><a href="#top">Наверх ↑</a></div>
+    <div class="wrap"><span>© 2026 Анечка Сетко · Video × AI creator</span><a href="#top">Наверх ↑</a></div>
   </footer>
 
   <script>
+    const header = document.getElementById('header');
+    addEventListener('scroll', () => header.classList.toggle('scrolled', scrollY > 40), { passive: true });
+
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, { threshold: 0.15 });
+    }, { threshold: 0.12 });
     document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+    document.querySelectorAll('.filters button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelector('.filters .active').classList.remove('active');
+        btn.classList.add('active');
+        document.querySelectorAll('.work').forEach((w) => {
+          w.classList.toggle('hide', btn.dataset.f !== 'all' && w.dataset.c !== btn.dataset.f);
+        });
+      });
+    });
   </script>
 </body>
 </html>
