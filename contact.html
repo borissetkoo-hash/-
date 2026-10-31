@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Контакты · Анечка Сетко</title>
+  <meta name="description" content="Связаться с Анечкой Сетко: съёмка и AI-контент, Оренбург и Москва.">
+  <meta name="theme-color" content="#1e1b18">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono&family=Playfair+Display:ital@1&family=Unbounded:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>try{var d=document.documentElement;if(sessionStorage.getItem('nav')){d.classList.add('arrive');sessionStorage.removeItem('nav')}}catch(e){}</script>
+</head>
+<body id="top">
+  <div class="curtain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"><span></span></div>
+  <div class="cursor-dot" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">ESH<b>•</b>SETKO</a>
+      <ul class="nav">
+        <li><a href="index.html">Главная</a></li>
+        <li><a href="works.html">Работы</a></li>
+        <li><a href="ai.html">AI</a></li>
+        <li><a href="about.html">Обо мне</a></li>
+        <li><a href="contact.html" aria-current="page">Контакты</a></li>
+      </ul>
+      <a href="contact.html" class="header-cta">Обсудить съёмку</a>
+      <button class="menu-btn" aria-label="Меню" aria-expanded="false"><i></i><i></i></button>
+    </div>
+  </header>
+
+  <nav class="mobile-menu" aria-label="Меню">
+    <ul>
+      <li><a href="index.html">Главная<small>01</small></a></li>
+      <li><a href="works.html">Работы<small>02</small></a></li>
+      <li><a href="ai.html">AI<small>03</small></a></li>
+      <li><a href="about.html">Обо мне<small>04</small></a></li>
+      <li><a href="contact.html" aria-current="page">Контакты<small>05</small></a></li>
+    </ul>
+    <div class="mm-foot">
+      <a href="https://www.instagram.com/esh_setko/" target="_blank" rel="noopener">Instagram ↗</a>
+      <a href="https://www.threads.net/@esh_setko" target="_blank" rel="noopener">Threads ↗</a>
+      <span>Оренбург / Москва</span>
+    </div>
+  </nav>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <div class="eyebrow">Контакты</div>
+        <h1 class="split">Давай <em>обсудим</em></h1>
+        <div class="intro">
+          <p class="reveal d2">Расскажи, что хочется снять или сгенерировать, а я предложу, как это сделать. Быстрее всего отвечаю в директе.</p>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-bottom:clamp(80px,14vh,160px)">
+      <div class="wrap contact-cards">
+        <a class="c-card reveal" href="https://ig.me/m/esh_setko" target="_blank" rel="noopener" data-cursor="Написать">
+          <span class="eyebrow">Instagram</span><b>@esh_setko</b><span class="arr">↗</span>
+        </a>
+        <a class="c-card reveal d1" href="https://www.threads.net/@esh_setko" target="_blank" rel="noopener" data-cursor="Открыть">
+          <span class="eyebrow">Threads</span><b>@esh_setko</b><span class="arr">↗</span>
+        </a>
+        <div class="c-card reveal d2">
+          <span class="eyebrow">Где снимаю</span><b>Оренбург, Москва<br>и выезды</b><span class="arr">✦</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" style="padding-top:0">
+      <div class="wrap brief">
+        <div class="reveal">
+          <div class="eyebrow">Бриф</div>
+          <div class="sec-head" style="margin-bottom:0"><h2>Заявка <em>за минуту</em></h2></div>
+          <p style="color:var(--muted);margin-top:20px;max-width:380px">Заполни, что знаешь. Текст заявки соберётся сам, его останется отправить мне в директ.</p>
+        </div>
+        <!-- Если появится почта, впишите её в data-email, и форма будет открывать письмо -->
+        <form id="brief" class="reveal d1" data-email="">
+          <div class="field">
+            <label for="f-name">Как тебя зовут</label>
+            <input id="f-name" name="name" autocomplete="name" placeholder="Имя">
+          </div>
+          <div class="field">
+            <span class="lbl">Что снимаем</span>
+            <div class="chips">
+              <input type="checkbox" id="w1" name="what" value="рилсы"><label for="w1">Рилсы</label>
+              <input type="checkbox" id="w2" name="what" value="travel-съёмку"><label for="w2">Travel</label>
+              <input type="checkbox" id="w3" name="what" value="личную съёмку"><label for="w3">Личная съёмка</label>
+              <input type="checkbox" id="w4" name="what" value="предметку"><label for="w4">Предметка</label>
+              <input type="checkbox" id="w5" name="what" value="AI-контент"><label for="w5">AI-контент</label>
+              <input type="checkbox" id="w6" name="what" value="что-то своё"><label for="w6">Что-то своё</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-when">Когда и где</label>
+            <input id="f-when" name="when" placeholder="Например: конец ноября, Москва">
+          </div>
+          <div class="field">
+            <label for="f-msg">Пара слов об идее</label>
+            <textarea id="f-msg" name="msg" placeholder="Настроение, референсы, ссылки"></textarea>
+          </div>
+          <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+            <button class="btn solid" type="submit">Собрать заявку <span class="arr">→</span></button>
+            <p class="form-note" role="status"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="sec" style="padding-top:0">
+      <div class="wrap">
+        <div class="sec-head reveal"><div><div class="eyebrow">Вопросы</div><h2>Частые <em>вопросы</em></h2></div></div>
+        <div class="faq reveal">
+          <details><summary>Как забронировать дату?</summary><p>Напиши в директ или заполни бриф выше. Я отвечу, и мы договоримся о деталях.</p></details>
+          <details><summary>Можно совместить съёмку и AI?</summary><p>Да, и это самое интересное. Снимаем исходник, а потом достраиваем то, чего не было на площадке: свет, фон, атмосферу.</p></details>
+          <details><summary>Сколько ждать результат?</summary><p>Зависит от объёма. Точные сроки назову после того, как поймём задачу.</p></details>
+          <details><summary>Выезжаешь в другие города?</summary><p>Базово я в Оренбурге и Москве. Про другие города и страны пиши, обсудим.</p></details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <a href="contact.html" class="mega-cta" data-cursor="Написать">
+    <div class="track">
+      <span>Давай <em>снимем</em> ✦</span><span>Давай <em>снимем</em> ✦</span><span>Давай <em>снимем</em> ✦</span><span>Давай <em>снимем</em> ✦</span>
+    </div>
+  </a>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a href="index.html" class="logo">ESH<b>•</b>SETKO</a>
+          <p>Видео и AI-контент. Оренбург, Москва и дальше, куда позовут.</p>
+        </div>
+        <div>
+          <h4>Страницы</h4>
+          <ul>
+            <li><a href="index.html">Главная</a></li>
+            <li><a href="works.html">Работы</a></li>
+            <li><a href="ai.html">AI</a></li>
+            <li><a href="about.html">Обо мне</a></li>
+            <li><a href="contact.html">Контакты</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Соцсети</h4>
+          <ul>
+            <li><a href="https://www.instagram.com/esh_setko/" target="_blank" rel="noopener">Instagram ↗</a></li>
+            <li><a href="https://www.threads.net/@esh_setko" target="_blank" rel="noopener">Threads ↗</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="bottom">
+        <span>© <span data-year>2026</span> Анечка Сетко</span>
+        <a href="#top">Наверх ↑</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
