@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 533">
+  <rect width="375" height="533" rx="14" fill="#3b3f78"/>
+  <g fill="#f2c779" font-family="Georgia, 'Times New Roman', serif" text-anchor="middle">
+    <text x="187.5" y="112" font-size="30" font-weight="700">מדינת ישראל</text>
+    <text x="187.5" y="148" font-size="21" font-weight="700" letter-spacing=".5">STATE OF ISRAEL</text>
+    <text x="187.5" y="368" font-size="38" font-weight="700" letter-spacing="6">דרכון</text>
+    <text x="187.5" y="405" font-size="20" font-weight="700" letter-spacing="1">PASSPORT</text>
+  </g>
+  <g fill="none" stroke="#f2c779" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Щит -->
+    <path stroke-width="3" d="M122 172h131v100c0 36-30 52-65.5 62C152 324 122 308 122 272z"/>
+    <!-- Менора -->
+    <g stroke-width="3.2">
+      <path d="M187.5 196v58"/>
+      <path d="M161 204v14a26.5 26.5 0 0 0 53 0v-14"/>
+      <path d="M169 204v14a18.5 18.5 0 0 0 37 0v-14"/>
+      <path d="M178 204v14a9.5 9.5 0 0 0 19 0v-14"/>
+    </g>
+    <path stroke-width="3" d="M174 254h27l4 12h-35zM166 266h43v8h-43z"/>
+    <!-- Оливковые ветви -->
+    <path stroke-width="2.4" d="M134 290c-6-30-4-62 6-96M241 290c6-30 4-62-6-96"/>
+    <g stroke-width="2">
+      <path d="M137 280c-7-2-11-7-12-13M137 280c6-3 9-8 9-14M136 262c-7-2-11-7-12-13M136 262c6-3 9-8 9-14M136 244c-6-3-10-8-10-14M137 244c6-4 8-9 7-15M139 226c-6-3-9-9-8-15M140 226c6-4 8-10 6-16"/>
+      <path d="M238 280c7-2 11-7 12-13M238 280c-6-3-9-8-9-14M239 262c7-2 11-7 12-13M239 262c-6-3-9-8-9-14M239 244c6-3 10-8 10-14M238 244c-6-4-8-9-7-15M236 226c6-3 9-9 8-15M235 226c-6-4-8-10-6-16"/>
+    </g>
+  </g>
+  <text x="187.5" y="306" fill="#f2c779" font-family="Georgia, serif" font-size="17" font-weight="700" text-anchor="middle">ישראל</text>
+  <!-- Значок чипа -->
+  <g fill="none" stroke="#f2c779" stroke-width="3">
+    <rect x="166" y="440" width="43" height="24" rx="2"/>
+    <path d="M166 452h12M197 452h12"/>
+    <ellipse cx="187.5" cy="452" rx="9" ry="6"/>
+  </g>
+  <rect x="166" y="440" width="43" height="24" rx="2" fill="#f2c779" opacity=".9"/>
+  <path d="M166 452h12M197 452h12" stroke="#3b3f78" stroke-width="2.5"/>
+  <ellipse cx="187.5" cy="452" rx="9" ry="6" fill="none" stroke="#3b3f78" stroke-width="2.5"/>
+</svg>
