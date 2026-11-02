@@ -1106,3 +1106,8 @@ html { overflow-x: clip; }
 @media (max-width: 1080px) { .stamp b { font-size: clamp(16px, 3.4vw, 26px); } }
 .stamp b { font-size: clamp(12px, 1.15vw, 20px); }
 @media (max-width: 1080px) { .stamp b { font-size: clamp(15px, 3vw, 22px); } }
+
+/* Работы: вместо названий крупно место и год */
+.masonry .tile h3 { font: 500 clamp(20px, 2vw, 30px)/1.1 var(--display); letter-spacing: -.02em; margin-top: 0; }
+.masonry .tile .info { padding: 24px; }
+@media (max-width: 600px) { .masonry .tile h3 { font-size: 15px; } .masonry .tile .info { padding: 12px; } }

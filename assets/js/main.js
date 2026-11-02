@@ -304,7 +304,8 @@
       const media = $('img, video', src);
       if (media) stage.append(media.cloneNode(true));
       title.textContent = $('h3', t).textContent;
-      cat.textContent = $('.cat', t).textContent;
+      const c = $('.cat', t);
+      cat.textContent = c ? c.textContent : '';
       count.textContent = `${String(idx + 1).padStart(2, '0')} / ${String(list.length).padStart(2, '0')}`;
     };
     const open = (t) => {
