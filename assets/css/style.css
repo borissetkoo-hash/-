@@ -1073,3 +1073,34 @@ body.menu-open .mobile-menu { clip-path: circle(150% at calc(100% - 40px) 40px);
 .slide-info h3 { text-transform: none; overflow-wrap: normal; font-size: clamp(18px, 1.7vw, 24px); letter-spacing: -.01em; }
 .credits { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .credits a, .credits b { overflow-wrap: anywhere; }
+
+/* Настоящие фото: вертикальные кадры */
+.film-strip .frame { width: clamp(120px, 12vw, 180px); aspect-ratio: 3 / 4; }
+.float-frame { background-size: cover; }
+.hs-bg > img { object-position: center 40%; }
+
+/* Чёткий вертикальный кадр поверх размытого фона (фото небольшого разрешения) */
+.ghost { text-shadow: none; }
+.reel-stack { display: none; }
+@media (min-width: 861px) {
+  .hs-bg > img { filter: blur(22px) brightness(.72) saturate(1.15); transform: scale(1.15); }
+  .reel-stack {
+    display: block; position: absolute; z-index: 1; left: 12%; top: 50%; transform: translateY(-50%) rotate(-3deg);
+    height: min(82%, 640px); aspect-ratio: 9 / 16; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, .4); border: 1px solid var(--glass-line);
+  }
+  .rs-item { position: absolute; inset: 0; opacity: 0; transition: opacity 1s ease; }
+  .rs-item.on { opacity: 1; }
+  .clear-side .rec, .hero-word { position: relative; z-index: 2; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .hs-bg > img { filter: blur(16px) brightness(.72); transform: scale(1.15); }
+  .reel-stack { display: block; position: absolute; left: 10%; top: 10%; height: 80%; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; transform: rotate(-3deg); }
+  .rs-item { position: absolute; inset: 0; opacity: 0; transition: opacity 1s; }
+  .rs-item.on { opacity: 1; }
+  .clear-side .rec, .hero-word { position: relative; z-index: 2; }
+}
+html { overflow-x: clip; }
+.stamps > * { min-width: 0; }
+.stamp b { font-size: clamp(13px, 1.45vw, 24px); }
+@media (max-width: 1080px) { .stamp b { font-size: clamp(16px, 3.4vw, 26px); } }

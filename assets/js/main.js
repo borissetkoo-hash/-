@@ -226,12 +226,12 @@
   }
 
   /* ---------- Первый экран: слайдер проектов ---------- */
-  const bgs = $$('.hs-bg'), infos = $$('.slide-info'), dotBtns = $$('.dots button'), cnt = $('.counter .mono-big');
+  const bgs = $$('.hs-bg'), infos = $$('.slide-info'), dotBtns = $$('.dots button'), reels = $$('.rs-item'), cnt = $('.counter .mono-big');
   if (bgs.length > 1) {
     let cur = 0, timer;
     const go = (i) => {
       cur = (i + bgs.length) % bgs.length;
-      [bgs, infos, dotBtns].forEach((list) => list.forEach((el, k) => el.classList.toggle('on', k === cur)));
+      [bgs, infos, dotBtns, reels].forEach((list) => list.forEach((el, k) => el.classList.toggle('on', k === cur)));
       cnt.textContent = String(cur + 1).padStart(2, '0');
     };
     const auto = () => { clearInterval(timer); if (!reduced) timer = setInterval(() => go(cur + 1), 5500); };
@@ -260,6 +260,7 @@
     $$('.places li a').forEach((a) => {
       a.addEventListener('mouseenter', (e) => {
         ff.className = `float-frame frame show ${a.dataset.scene}`;
+        ff.style.background = a.dataset.img ? `url("${a.dataset.img}") center / cover` : '';
         if (!run) { cx = fx = e.clientX; cy = fy = e.clientY; run = true; follow(); }
       });
       a.addEventListener('mousemove', (e) => { fx = e.clientX; fy = e.clientY; });
