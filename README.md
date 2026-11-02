@@ -8,6 +8,8 @@ PitchMind is a 2D football (soccer) match engine and web app written in TypeScri
 
 ## Features
 
+- **Matchday look**: the interface is styled like matchday ephemera on a kraft-paper desk — paper sheets and ruled notepads, perforated stamps for club choice, dressing-room lockers for the main menu, a mustard flip-clock scoreboard, sticker buttons, folder-tab navigation, a red rubber stamp on boardroom memos and a manila envelope for the grey schemes. Typefaces (Rubik, Oswald, Caveat, PT Mono — all with Cyrillic) are bundled into the build, so the look never depends on a font CDN. A dimmed "night in the dressing room" palette follows the system dark mode.
+
 - **Loading screen and main menu** — a game hub with season status, clubs and settings (language, pitch orientation, match speed, auto replays).
 - **Portrait match view** (default): a tall pitch with your team attacking upwards, match stats and controls stacked on the right; landscape view available in settings.
 - **Six leagues, 58 clubs**: England, Spain, Italy, Germany and Brazil (10 clubs each) plus the fictional Northern League. Clubs from real countries carry unlicensed-style names (“Manchester”, “Madrid Rojiblanco”, “Rio Rubro-Negro”) and **original procedural crests** (shield shape, field pattern, emblem, initials in club colours) — no real club names or badges are reproduced. Real coaches sit at their 2024/25 clubs; the rest get generated coaches with drawn portraits and country-appropriate names, as do the players.

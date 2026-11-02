@@ -123,12 +123,12 @@ export class PitchRenderer {
     const hoy = (ch - PITCH.width * s) / 2;
     const X = (x: number) => hox + x * s;
     const Y = (y: number) => hoy + y * s;
-    g.fillStyle = '#1f6b35';
+    g.fillStyle = '#2e6a3a';
     g.fillRect(0, 0, cw, ch);
     // Mowing stripes.
     const stripes = 14;
     for (let i = 0; i < stripes; i++) {
-      g.fillStyle = i % 2 ? '#2a7d40' : '#26763b';
+      g.fillStyle = i % 2 ? '#3a7a45' : '#34723f';
       g.fillRect(X((PITCH.length / stripes) * i), Y(0), (PITCH.length / stripes) * s + 0.5, PITCH.width * s);
     }
     // Vignette.
@@ -192,7 +192,7 @@ export class PitchRenderer {
         g.stroke();
       }
       g.restore();
-      g.strokeStyle = '#ffffff';
+      g.strokeStyle = '#f4ecd9';
       g.lineWidth = Math.max(2, s * 0.2);
       g.strokeRect(gx, Y(GOAL_TOP), 2 * s, PITCH.goalWidth * s);
       g.strokeStyle = 'rgba(255,255,255,0.85)';

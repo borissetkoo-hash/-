@@ -1,3 +1,4 @@
+import './fonts.css';
 import './styles.css';
 import { clubById } from './data/clubs';
 import { type Lang, getLang, setLang, t } from './i18n';
