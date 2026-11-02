@@ -1168,3 +1168,15 @@ html { overflow-x: clip; }
 .gift-video iframe { width: 100%; height: 100%; border: 0; display: block; }
 .passport { width: 34px; }
 .passport img { display: block; width: 100%; height: auto; border-radius: 3px; }
+
+/* Паспорт выглядывает из-под штампа Israel */
+.stamps-wrap { padding-bottom: 0; }
+.stamp-slot { position: relative; min-width: 0; }
+.stamp-slot .stamp { position: relative; z-index: 1; background: var(--night); }
+.stamp-slot .passport {
+  position: absolute; z-index: 0; right: -4%; bottom: -6%; width: 24%; min-width: 22px;
+  transform: rotate(24deg); opacity: .9;
+}
+.stamp-slot .passport:hover, .stamp-slot .passport:focus-visible { transform: rotate(14deg) translate(14%, 10%) scale(1.25); opacity: 1; }
+.stamp-slot .passport { right: 9%; bottom: 5%; width: 26%; }
+.stamp-slot .passport { right: 6%; bottom: 2%; }
