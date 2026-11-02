@@ -257,9 +257,9 @@
       ff.style.left = `${cx}px`; ff.style.top = `${cy}px`;
       if (run) requestAnimationFrame(follow);
     };
-    $$('.places li a').forEach((a) => {
+    $$('.places li a, .pj-list a[data-img]').forEach((a) => {
       a.addEventListener('mouseenter', (e) => {
-        ff.className = `float-frame frame show ${a.dataset.scene}`;
+        ff.className = `float-frame frame show ${a.dataset.scene || ''}`;
         ff.style.background = a.dataset.img ? `url("${a.dataset.img}") center / cover` : '';
         if (!run) { cx = fx = e.clientX; cy = fy = e.clientY; run = true; follow(); }
       });

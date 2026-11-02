@@ -1111,3 +1111,19 @@ html { overflow-x: clip; }
 .masonry .tile h3 { font: 500 clamp(20px, 2vw, 30px)/1.1 var(--display); letter-spacing: -.02em; margin-top: 0; }
 .masonry .tile .info { padding: 24px; }
 @media (max-width: 600px) { .masonry .tile h3 { font-size: 15px; } .masonry .tile .info { padding: 12px; } }
+
+/* Настоящие AI-работы и галереи проектов */
+.ai-duo { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 2vw, 28px); }
+.ai-duo .frame { aspect-ratio: 4 / 5; border-radius: 6px; }
+.ai-duo figcaption, .pj-gallery + figcaption { margin-top: 14px; color: var(--muted); font-size: 14px; }
+.ai-duo figcaption b { color: var(--text); font-weight: 500; }
+.pj-gallery { display: grid; gap: 14px; grid-template-columns: repeat(var(--n, 2), 1fr); }
+.pj-gallery.g2 { --n: 2; max-width: 900px; } .pj-gallery.g3 { --n: 3; } .pj-gallery.g4 { --n: 4; }
+.pj-gallery .frame { aspect-ratio: 9 / 16; border-radius: 6px; }
+.pj-card .frame > img { object-position: center 30%; }
+.hs-card .cap h3 { font-size: clamp(16px, 1.5vw, 22px); }
+@media (max-width: 600px) {
+  .ai-duo { grid-template-columns: 1fr; }
+  .pj-gallery.g3, .pj-gallery.g4 { --n: 2; }
+}
+.pj-card .frame { aspect-ratio: 4 / 5; }
