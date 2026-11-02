@@ -205,24 +205,31 @@
     });
   }
 
-  /* ---------- Плеер шоурила ---------- */
-  const player = $('.player');
-  if (player) {
+  /* ---------- Плееры: шоурил и секретное видео ---------- */
+  const setupPlayer = (player, triggers) => {
+    if (!player) return null;
     const frame = $('iframe', player);
     const open = () => {
       player.classList.add('open');
       if (frame && frame.dataset.src) frame.src = frame.dataset.src;
-      const v = $('video', player); if (v) v.play().catch(() => {});
     };
     const close = () => {
       player.classList.remove('open');
       if (frame && frame.dataset.src) frame.src = 'about:blank';
-      const v = $('video', player); if (v) v.pause();
+      if (location.hash === '#' + player.id) history.replaceState(null, '', location.pathname);
     };
-    $$('[data-open-player]').forEach((b) => b.addEventListener('click', open));
+    $$(triggers).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); open(); }));
     $('.close', player).addEventListener('click', close);
     player.addEventListener('click', (e) => { if (e.target === player) close(); });
-    addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    addEventListener('keydown', (e) => { if (e.key === 'Escape' && player.classList.contains('open')) close(); });
+    return open;
+  };
+  setupPlayer($('.player:not(.secret)'), '[data-open-player]');
+  const openSecret = setupPlayer($('.player.secret'), '[data-secret]');
+  if (openSecret) {
+    const check = () => { if (location.hash === '#podarok') openSecret(); };
+    addEventListener('hashchange', check);
+    check();
   }
 
   /* ---------- Первый экран: слайдер проектов ---------- */

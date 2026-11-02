@@ -1146,3 +1146,6 @@ html { overflow-x: clip; }
   .glass-side { border-radius: var(--r) 0 0 var(--r); }
 }
 @media (max-width: 600px) { :root { --r: 14px; } }
+
+/* Шоурил с YouTube */
+.player .screen.yt { width: min(1100px, 92vw, calc(86svh * 16 / 9)); height: auto; aspect-ratio: 16 / 9; background: #000; }

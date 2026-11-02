@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono&family=Playfair+Display:ital@1&family=Unbounded:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
-  <script>try{var d=document.documentElement;if(sessionStorage.getItem('nav')){d.classList.add('arrive');sessionStorage.removeItem('nav')}if(!sessionStorage.getItem('seen')){d.classList.add('preload');sessionStorage.setItem('seen','1')}}catch(e){}</script>
+  <script>try{var d=document.documentElement;if(sessionStorage.getItem('nav')){d.classList.add('arrive');sessionStorage.removeItem('nav')}if(location.hash!=='#podarok'&&!sessionStorage.getItem('seen')){d.classList.add('preload');sessionStorage.setItem('seen','1')}}catch(e){}</script>
 </head>
 <body id="top">
   <div class="curtain" aria-hidden="true"></div>
@@ -296,6 +296,14 @@
       <button class="close" aria-label="Закрыть">✕</button>
       <div class="screen">
         <iframe src="about:blank" data-src="https://www.instagram.com/reel/DHfkUcit4me/embed/" title="Тревел-шоурил «4 страны»" allowtransparency="true" allow="encrypted-media" scrolling="no"></iframe>
+      </div>
+    </div>
+
+    <!-- Секретное видео: открывается по ссылке index.html#podarok или любым элементом с data-secret -->
+    <div class="player secret" id="podarok" role="dialog" aria-modal="true" aria-label="Видео">
+      <button class="close" aria-label="Закрыть">✕</button>
+      <div class="screen yt">
+        <iframe src="about:blank" data-src="https://www.youtube-nocookie.com/embed/DDVKqaNgoqE?autoplay=1&amp;rel=0&amp;playsinline=1" title="Видео" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
       </div>
     </div>
   </main>
