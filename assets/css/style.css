@@ -1104,3 +1104,5 @@ html { overflow-x: clip; }
 .stamps > * { min-width: 0; }
 .stamp b { font-size: clamp(13px, 1.45vw, 24px); }
 @media (max-width: 1080px) { .stamp b { font-size: clamp(16px, 3.4vw, 26px); } }
+.stamp b { font-size: clamp(12px, 1.15vw, 20px); }
+@media (max-width: 1080px) { .stamp b { font-size: clamp(15px, 3vw, 22px); } }
