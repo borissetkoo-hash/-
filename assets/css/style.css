@@ -1127,3 +1127,22 @@ html { overflow-x: clip; }
   .pj-gallery.g3, .pj-gallery.g4 { --n: 2; }
 }
 .pj-card .frame { aspect-ratio: 4 / 5; }
+
+/* Скруглённые углы у всех фото */
+:root { --r: 20px; }
+.hs-card .frame, .tile, .pj-card .frame, .pj-gallery .frame, .ai-duo .frame, .reel-embed,
+.float-frame, .ss-item, .lb-stage .frame, .hs-end, .c-card, .player .screen, .reel-stack { border-radius: var(--r); }
+.tile .frame { border-radius: 0; }
+.portrait { border-radius: 300px 300px var(--r) var(--r); }
+.film-strip .frame { border-radius: 10px; }
+.hero-card { border-radius: var(--r); }
+.glass-side { border-radius: var(--r) 0 0 var(--r); }
+.clear-side { border-radius: 0 var(--r) var(--r) 0; }
+@media (max-width: 860px) {
+  .glass-side { border-radius: 0 0 var(--r) var(--r); }
+  .clear-side { border-radius: var(--r) var(--r) 0 0; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .glass-side { border-radius: var(--r) 0 0 var(--r); }
+}
+@media (max-width: 600px) { :root { --r: 14px; } }
