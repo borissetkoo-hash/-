@@ -8,7 +8,7 @@ PitchMind is a 2D football (soccer) match engine and web app written in TypeScri
 
 ## Features
 
-- **Matchday look**: the interface is styled like matchday ephemera on a kraft-paper desk — paper sheets and ruled notepads, perforated stamps for club choice, dressing-room lockers for the main menu, a mustard flip-clock scoreboard, sticker buttons, folder-tab navigation, a red rubber stamp on boardroom memos and a manila envelope for the grey schemes. Typefaces (Rubik, Oswald, Caveat, PT Mono — all with Cyrillic) are bundled into the build, so the look never depends on a font CDN. A dimmed "night in the dressing room" palette follows the system dark mode.
+- **Matchday look**: the interface is built from materials rather than flat colour — a planked wooden desk, aged paper sheets held down with masking tape, ruled notepads, perforated stamps for club choice, chipped-paint dressing-room lockers with rivets and stickers for the main menu, a sunburst matchday poster with repeated lettering, a flip-clock scoreboard and a rubber-stamped boardroom memo. All textures are drawn procedurally (SVG noise), so the page ships no image files. Typefaces with Cyrillic are bundled into the build: Underdog for marker-style headings, Rubik Dirt for worn poster print, Amatic SC for handwritten notes, Oswald for labels, Rubik and PT Mono for text and figures. A dimmed palette follows the system dark mode.
 
 - **Loading screen and main menu** — a game hub with season status, clubs and settings (language, pitch orientation, match speed, auto replays).
 - **Portrait match view** (default): a tall pitch with your team attacking upwards, match stats and controls stacked on the right; landscape view available in settings.

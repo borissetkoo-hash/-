@@ -22,9 +22,11 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/amatic-sc": "^5.3.0",
     "@fontsource/oswald": "^5.3.0",
     "@fontsource/pt-mono": "^5.3.0",
-    "@fontsource/rubik": "^5.3.0"
+    "@fontsource/rubik": "^5.3.0",
+    "@fontsource/rubik-dirt": "^5.3.0",
+    "@fontsource/underdog": "^5.3.0"
   }
 }

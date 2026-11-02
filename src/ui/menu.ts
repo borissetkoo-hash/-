@@ -27,14 +27,14 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
     <div class="menu">
       <nav class="menu-list" aria-label="Main menu">
         <div class="menu-title"><span class="brand-mark">◉</span> PitchMind</div>
-        <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${portraitHtml(career.coach.look, 52)}</span>` : ''}<b>👔 ${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
-        <a class="menu-item primary owner-tile" href="#/owner"><b>💼 ${owner ? t('menuOwnerCont') : t('menuOwner')}</b><span>${owner ? esc(owner) : t('menuOwnerSub')}</span></a>
-        <a class="menu-item" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
-        <a class="menu-item" href="#/league"><b>🏆 ${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
-        <a class="menu-item" href="#/coaches"><b>👔 ${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>
-        <a class="menu-item" href="#/clubs"><b>🛡 ${t('menuClubs')}</b><span>${t('menuClubsSub')}</span></a>
-        <a class="menu-item" href="#/about"><b>🧠 ${t('navAbout')}</b><span>${t('menuAboutSub')}</span></a>
-        <button class="menu-item" type="button" id="openSettings"><b>⚙ ${t('settings')}</b><span>${t('settingsSub')}</span></button>
+        <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${portraitHtml(career.coach.look, 52)}</span>` : ''}<i class="sticker" aria-hidden="true">👔</i><b>${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
+        <a class="menu-item primary owner-tile" href="#/owner"><i class="sticker" aria-hidden="true">💼</i><b>${owner ? t('menuOwnerCont') : t('menuOwner')}</b><span>${owner ? esc(owner) : t('menuOwnerSub')}</span></a>
+        <a class="menu-item" href="#/match"><i class="sticker" aria-hidden="true">⚽</i><b>${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
+        <a class="menu-item" href="#/league"><i class="sticker" aria-hidden="true">🏆</i><b>${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
+        <a class="menu-item" href="#/coaches"><i class="sticker" aria-hidden="true">👔</i><b>${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>
+        <a class="menu-item" href="#/clubs"><i class="sticker" aria-hidden="true">🛡</i><b>${t('menuClubs')}</b><span>${t('menuClubsSub')}</span></a>
+        <a class="menu-item" href="#/about"><i class="sticker" aria-hidden="true">🧠</i><b>${t('navAbout')}</b><span>${t('menuAboutSub')}</span></a>
+        <button class="menu-item" type="button" id="openSettings"><i class="sticker" aria-hidden="true">⚙</i><b>${t('settings')}</b><span>${t('settingsSub')}</span></button>
       </nav>
       <section class="menu-side">
         <div class="panel menu-card">
